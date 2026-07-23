@@ -64,6 +64,10 @@ function getSslOption(url: string) {
 let db: ReturnType<typeof drizzle> | null = null;
 let sqlClient: ReturnType<typeof postgres> | null = null;
 
+// Memory caches for read-heavy static data to make APIs ultra-fast
+let uiSettingsMemoryCache: { data: any[]; timestamp: number } | null = null;
+let categoriesMemoryCache: { data: any[]; timestamp: number } | null = null;
+
 export function getDb() {
   if (!db) {
     // Use DATABASE_URL from environment variables
@@ -248,26 +252,35 @@ export class DatabaseStorage {
 
   // Categories
   async getCategories(): Promise<Category[]> {
+    const now = Date.now();
+    if (categoriesMemoryCache && (now - categoriesMemoryCache.timestamp < 15000)) {
+      return categoriesMemoryCache.data;
+    }
     try {
       const result = await this.db.select().from(categories);
-      return Array.isArray(result) ? result : [];
+      const data = Array.isArray(result) ? result : [];
+      categoriesMemoryCache = { data, timestamp: now };
+      return data;
     } catch (error) {
       console.error('Error fetching categories:', error);
-      return [];
+      return categoriesMemoryCache?.data || [];
     }
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
+    categoriesMemoryCache = null;
     const [newCategory] = await this.db.insert(categories).values(category).returning();
     return newCategory;
   }
 
   async updateCategory(id: string, category: Partial<InsertCategory>): Promise<Category | undefined> {
+    categoriesMemoryCache = null;
     const [updated] = await this.db.update(categories).set(category).where(eq(categories.id, id)).returning();
     return updated;
   }
 
   async deleteCategory(id: string): Promise<boolean> {
+    categoriesMemoryCache = null;
     try {
       // Set categoryId to null in restaurants
       await this.db.update(restaurants).set({ categoryId: null }).where(eq(restaurants.categoryId, id));
@@ -813,24 +826,28 @@ export class DatabaseStorage {
 
   // UI Settings (using systemSettings)
   async getUiSettings(): Promise<SystemSettings[]> {
+    const now = Date.now();
+    if (uiSettingsMemoryCache && (now - uiSettingsMemoryCache.timestamp < 15000)) {
+      return uiSettingsMemoryCache.data;
+    }
     try {
       const result = await this.db.select().from(systemSettings);
-      // Ensure we always return an array, even if result is null or undefined
-      return Array.isArray(result) ? result : [];
+      const data = Array.isArray(result) ? result : [];
+      uiSettingsMemoryCache = { data, timestamp: now };
+      return data;
     } catch (error) {
       console.error('Error fetching UI settings:', error);
-      return [];
+      return uiSettingsMemoryCache?.data || [];
     }
   }
 
   async getUiSetting(key: string): Promise<SystemSettings | undefined> {
-    const [setting] = await this.db.select().from(systemSettings).where(
-      eq(systemSettings.key, key)
-    );
-    return setting;
+    const settingsList = await this.getUiSettings();
+    return settingsList.find((s) => s.key === key);
   }
 
   async updateUiSetting(key: string, value: string): Promise<SystemSettings | undefined> {
+    uiSettingsMemoryCache = null;
     try {
       // Try to update existing setting
       const [updated] = await this.db.update(systemSettings)
@@ -861,11 +878,13 @@ export class DatabaseStorage {
   }
 
   async createUiSetting(setting: InsertSystemSettings): Promise<SystemSettings> {
+    uiSettingsMemoryCache = null;
     const [newSetting] = await this.db.insert(systemSettings).values(setting).returning();
     return newSetting;
   }
 
   async deleteUiSetting(key: string): Promise<boolean> {
+    uiSettingsMemoryCache = null;
     const result = await this.db.delete(systemSettings).where(eq(systemSettings.key, key));
     return result.rowCount > 0;
   }

@@ -19,13 +19,13 @@ export function NotificationSystem({ userType, userId }: NotificationSystemProps
 
   const { data: orders } = useQuery<Order[]>({
     queryKey: ['/api/orders'],
-    refetchInterval: userType === 'admin' ? 5000 : userType === 'driver' ? 3000 : 10000,
+    refetchInterval: userType === 'admin' ? 15000 : userType === 'driver' ? 12000 : 25000,
   });
 
   const { data: driverOrders } = useQuery<Order[]>({
     queryKey: ['/api/orders', { status: 'confirmed' }],
     enabled: userType === 'driver',
-    refetchInterval: 3000,
+    refetchInterval: 12000,
   });
 
   // مراقبة الطلبات الجديدة للمدير

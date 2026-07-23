@@ -808,6 +808,36 @@ export async function ensureTablesExist() {
         created_at TIMESTAMP DEFAULT NOW() NOT NULL,
         updated_at TIMESTAMP DEFAULT NOW() NOT NULL
       );
+
+      -- Create indexes for super-fast database queries
+      CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+      CREATE INDEX IF NOT EXISTS idx_orders_driver_id ON orders(driver_id);
+      CREATE INDEX IF NOT EXISTS idx_orders_restaurant_id ON orders(restaurant_id);
+      CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+      CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_menu_items_restaurant_id ON menu_items(restaurant_id);
+      CREATE INDEX IF NOT EXISTS idx_menu_items_category_id ON menu_items(category_id);
+      CREATE INDEX IF NOT EXISTS idx_menu_items_is_available ON menu_items(is_available);
+
+      CREATE INDEX IF NOT EXISTS idx_restaurants_category_id ON restaurants(category_id);
+      CREATE INDEX IF NOT EXISTS idx_restaurants_is_active ON restaurants(is_active);
+
+      CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_type, recipient_id);
+      CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+
+      CREATE INDEX IF NOT EXISTS idx_wasalni_customer_id ON wasalni_requests(customer_id);
+      CREATE INDEX IF NOT EXISTS idx_wasalni_driver_id ON wasalni_requests(driver_id);
+      CREATE INDEX IF NOT EXISTS idx_wasalni_status ON wasalni_requests(status);
+
+      CREATE INDEX IF NOT EXISTS idx_user_addresses_user_id ON user_addresses(user_id);
+      CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key);
+      CREATE INDEX IF NOT EXISTS idx_messages_order_id ON messages(order_id);
+      CREATE INDEX IF NOT EXISTS idx_drivers_user_id ON drivers(user_id);
+      CREATE INDEX IF NOT EXISTS idx_drivers_status ON drivers(status);
+      CREATE INDEX IF NOT EXISTS idx_special_offers_active ON special_offers(is_active);
+      CREATE INDEX IF NOT EXISTS idx_cart_user_id ON cart(user_id);
+      CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
     `);
     console.log("✅ All database tables verified and created successfully.");
   } catch (err: any) {
