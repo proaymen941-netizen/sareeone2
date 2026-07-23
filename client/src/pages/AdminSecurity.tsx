@@ -5,7 +5,7 @@ import {
   RefreshCw, Users, Globe, Smartphone,
   Mail, Phone, MapPin, Calendar, Clock,
   Lock, Unlock, Bell, MessageSquare, AlertCircle,
-  Save, Trash2, Plus, Key, CheckCircle2, ShieldAlert,
+  Save, Trash2, Plus, Key, CheckCircle2, ShieldAlert, ShieldCheck,
   Search, Filter, Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

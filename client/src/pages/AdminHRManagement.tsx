@@ -1027,10 +1027,11 @@ function ExpensesPanel({ uiSettings }: { uiSettings?: any[] }) {
 
             <div className="space-y-1 pt-1">
               <ImageUpload
-                label="إدراج وتصوير إيصال/فاتورة الإخراج (رفع مباشر من جهازك)"
+                label="إدراج وتصوير إيصال/فاتورة الإخراج (اختياري - رفع مباشر من جهازك)"
                 value={form.documents[0] || ''}
                 onChange={(url) => setForm({ ...form, documents: url ? [url] : [] })}
                 bucket="expense-receipts"
+                required={false}
               />
             </div>
           </div>

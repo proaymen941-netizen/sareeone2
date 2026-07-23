@@ -1660,20 +1660,44 @@ router.get("/financial-reports", async (req, res) => {
 
 router.get("/expenses", async (req, res) => {
   try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS app_expenses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title VARCHAR(255) NOT NULL,
+        category VARCHAR(100) DEFAULT 'operational' NOT NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        expense_date TIMESTAMP DEFAULT NOW() NOT NULL,
+        notes TEXT,
+        recipient VARCHAR(255),
+        documents TEXT,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+    `);
     const expensesList = await db.execute(sql`SELECT * FROM app_expenses ORDER BY expense_date DESC`);
     const rows = expensesList.rows || expensesList;
-    res.json(rows.map((row: any) => ({
-      id: row.id,
-      title: row.title,
-      category: row.category,
-      amount: parseFloat(row.amount || '0'),
-      expenseDate: row.expense_date || row.expenseDate,
-      notes: row.notes || '',
-      recipient: row.recipient || '',
-      documents: row.documents ? (typeof row.documents === 'string' ? JSON.parse(row.documents) : row.documents) : [],
-      createdBy: row.created_by || row.createdBy || 'المدير العام',
-      createdAt: row.created_at || row.createdAt,
-    })));
+    res.json(rows.map((row: any) => {
+      let docs: any[] = [];
+      if (row.documents) {
+        if (typeof row.documents === 'string') {
+          try { docs = JSON.parse(row.documents); } catch { docs = [row.documents]; }
+        } else if (Array.isArray(row.documents)) {
+          docs = row.documents;
+        }
+      }
+      return {
+        id: row.id,
+        title: row.title,
+        category: row.category,
+        amount: parseFloat(row.amount || '0'),
+        expenseDate: row.expense_date || row.expenseDate,
+        notes: row.notes || '',
+        recipient: row.recipient || '',
+        documents: docs,
+        createdBy: row.created_by || row.createdBy || 'المدير العام',
+        createdAt: row.created_at || row.createdAt,
+      };
+    }));
   } catch (error) {
     console.error("خطأ في جلب المصروفات:", error);
     res.status(500).json({ error: "خطأ في الخادم" });
@@ -1683,11 +1707,26 @@ router.get("/expenses", async (req, res) => {
 router.post("/expenses", async (req, res) => {
   try {
     const { title, category, amount, expenseDate, notes, recipient, documents, createdBy } = req.body;
-    if (!title || amount === undefined || amount === null) {
+    if (!title || amount === undefined || amount === null || String(amount).trim() === '') {
       return res.status(400).json({ error: "البيان والمبلغ مطلوبة" });
     }
 
-    const docsJson = JSON.stringify(Array.isArray(documents) ? documents : []);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS app_expenses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title VARCHAR(255) NOT NULL,
+        category VARCHAR(100) DEFAULT 'operational' NOT NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        expense_date TIMESTAMP DEFAULT NOW() NOT NULL,
+        notes TEXT,
+        recipient VARCHAR(255),
+        documents TEXT,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+    `);
+
+    const docsJson = JSON.stringify(Array.isArray(documents) ? documents : (documents ? [documents] : []));
     const dateVal = expenseDate ? new Date(expenseDate) : new Date();
     const userVal = createdBy || (req as any).user?.name || 'المدير العام';
 
@@ -1698,6 +1737,15 @@ router.post("/expenses", async (req, res) => {
     `);
 
     const row: any = (result.rows || result)[0];
+    let docsResult: any[] = [];
+    if (row.documents) {
+      if (typeof row.documents === 'string') {
+        try { docsResult = JSON.parse(row.documents); } catch { docsResult = [row.documents]; }
+      } else if (Array.isArray(row.documents)) {
+        docsResult = row.documents;
+      }
+    }
+
     res.json({
       id: row.id,
       title: row.title,
@@ -1706,7 +1754,7 @@ router.post("/expenses", async (req, res) => {
       expenseDate: row.expense_date,
       notes: row.notes,
       recipient: row.recipient,
-      documents: row.documents ? JSON.parse(row.documents) : [],
+      documents: docsResult,
       createdBy: row.created_by,
       createdAt: row.created_at,
     });
