@@ -15,6 +15,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useUiSettings } from '@/context/UiSettingsContext';
+import { getAppStatus } from '../utils/restaurantHours';
 import { CustomerNotificationsPanel } from './CustomerNotificationsPanel';
 import waselLogo from '@assets/wasel-logo.png';
 
@@ -24,33 +25,31 @@ const WorkingHoursIndicator: React.FC = () => {
   const storeStatus = getSetting('store_status') || 'auto';
   const openingTime = getSetting('opening_time') || '08:00';
   const closingTime = getSetting('closing_time') || '23:00';
+  const storeEmergencyClosed = getSetting('store_emergency_closed', 'false');
+  const emergencyMessage = getSetting('store_emergency_message', '');
+  const workingDays = getSetting('working_days', '0,1,2,3,4,5,6');
 
-  // حساب الحالة الفعلية
-  const computeIsOpen = (): boolean => {
-    if (storeStatus === 'open') return true;
-    if (storeStatus === 'closed') return false;
-    // تلقائي - حسب ساعات العمل
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const toMin = (t: string) => {
-      const [h, m] = t.split(':').map(Number);
-      return (h || 0) * 60 + (m || 0);
-    };
-    const open = toMin(openingTime);
-    const close = toMin(closingTime);
-    if (close > open) return currentMinutes >= open && currentMinutes < close;
-    // عبور منتصف الليل
-    return currentMinutes >= open || currentMinutes < close;
+  const computeStatus = () => {
+    return getAppStatus(
+      openingTime,
+      closingTime,
+      storeStatus,
+      storeEmergencyClosed,
+      emergencyMessage,
+      workingDays
+    );
   };
 
-  const [isOpen, setIsOpen] = React.useState(computeIsOpen);
+  const [appStatus, setAppStatus] = React.useState(computeStatus);
 
   React.useEffect(() => {
-    setIsOpen(computeIsOpen());
-    const t = setInterval(() => setIsOpen(computeIsOpen()), 60000);
+    setAppStatus(computeStatus());
+    const t = setInterval(() => setAppStatus(computeStatus()), 15000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeStatus, openingTime, closingTime]);
+  }, [storeStatus, openingTime, closingTime, storeEmergencyClosed, emergencyMessage, workingDays]);
+
+  const isOpen = appStatus.isOpen;
 
   // تنسيق 12 ساعة مع ص/م بالعربية
   const format12 = (t: string): string => {

@@ -57,7 +57,7 @@ export function UiSettingsProvider({ children }: { children: React.ReactNode }) 
 
   const loadSettings = useCallback(async (isInitial = false) => {
     try {
-      const response = await fetch('/api/admin/ui-settings');
+      const response = await fetch('/api/ui-settings');
       if (response.ok) {
         const settingsData: UiSetting[] = await response.json();
         const settingsMap = settingsData.reduce((acc, setting) => {
@@ -116,7 +116,7 @@ export function UiSettingsProvider({ children }: { children: React.ReactNode }) 
     }
   }, [loadSettings]);
 
-  const updateSetting = async (key: string, value: string) => {
+  const updateSetting = useCallback(async (key: string, value: string) => {
     try {
       const adminToken = localStorage.getItem('admin_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -130,29 +130,31 @@ export function UiSettingsProvider({ children }: { children: React.ReactNode }) 
       });
 
       if (response.ok) {
-        const newSettings = { ...settings, [key]: value };
-        setSettings(newSettings);
-        saveCachedSettings(newSettings);
+        setSettings(prev => {
+          const newSettings = { ...prev, [key]: value };
+          saveCachedSettings(newSettings);
+          return newSettings;
+        });
       }
     } catch (error) {
       console.error('خطأ في تحديث الإعداد:', error);
     }
-  };
+  }, []);
 
-  const getSetting = (key: string, defaultValue: string = '') => {
+  const getSetting = useCallback((key: string, defaultValue: string = '') => {
     return settings[key] !== undefined ? settings[key] : defaultValue;
-  };
+  }, [settings]);
 
-  const isFeatureEnabled = (key: string) => {
-    const value = getSetting(key);
+  const isFeatureEnabled = useCallback((key: string) => {
+    const value = settings[key] !== undefined ? settings[key] : '';
     if (value === '') return true;
     return value !== 'false';
-  };
+  }, [settings]);
 
-  const refreshSettings = async () => {
+  const refreshSettings = useCallback(async () => {
     setLoading(true);
     await loadSettings(true);
-  };
+  }, [loadSettings]);
 
   useEffect(() => {
     // Load settings on mount (cached data shown immediately, then fetch fresh)

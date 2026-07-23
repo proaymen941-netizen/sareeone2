@@ -81,6 +81,36 @@ export default function AdminBusinessHours() {
     }
   });
 
+  // تحويل الوقت إلى نسق 12 ساعة مع "ص" أو "م"
+  const formatTimeArabic12 = (timeStr: string): string => {
+    if (!timeStr) return '';
+    const [hStr, mStr] = timeStr.split(':');
+    let h = parseInt(hStr, 10);
+    const m = mStr || '00';
+    if (isNaN(h)) return timeStr;
+    const period = h >= 12 ? 'م (مساءً)' : 'ص (صباحاً)';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return `${h}:${m} ${period}`;
+  };
+
+  // تغيير الوقت بين ص و م
+  const toggleTimeAmPm = (timeStr: string, targetPeriod: 'AM' | 'PM'): string => {
+    if (!timeStr) return timeStr;
+    const parts = timeStr.split(':');
+    let h = parseInt(parts[0], 10);
+    const m = parts[1] || '00';
+    if (isNaN(h)) return timeStr;
+
+    if (targetPeriod === 'AM') {
+      if (h >= 12) h = h - 12;
+    } else {
+      if (h < 12) h = h + 12;
+    }
+    const hStr = h.toString().padStart(2, '0');
+    return `${hStr}:${m}`;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -89,16 +119,6 @@ export default function AdminBusinessHours() {
       toast({
         title: "بيانات ناقصة",
         description: "يرجى ملء جميع الحقول المطلوبة",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // التحقق من أن وقت الفتح قبل وقت الإغلاق
-    if (formData.opening_time >= formData.closing_time) {
-      toast({
-        title: "خطأ في الأوقات",
-        description: "وقت الفتح يجب أن يكون قبل وقت الإغلاق",
         variant: "destructive"
       });
       return;
@@ -184,42 +204,103 @@ export default function AdminBusinessHours() {
 
             {/* Opening Time */}
             <div className="space-y-2">
-              <Label htmlFor="opening_time" className="text-sm font-medium">
+              <Label htmlFor="opening_time" className="text-sm font-medium block">
                 وقت الفتح
               </Label>
-              <Input
-                id="opening_time"
-                type="time"
-                value={formData.opening_time}
-                onChange={(e) => handleInputChange('opening_time', e.target.value)}
-                className="max-w-xs"
-                data-testid="input-opening-time"
-              />
+              <div className="flex flex-wrap items-center gap-3">
+                <Input
+                  id="opening_time"
+                  type="time"
+                  value={formData.opening_time}
+                  onChange={(e) => handleInputChange('opening_time', e.target.value)}
+                  className="w-36 text-center font-mono font-bold text-base"
+                  data-testid="input-opening-time"
+                />
+                <span className="px-3 py-1.5 bg-blue-100 text-blue-900 rounded-md text-sm font-bold border border-blue-200 min-w-[120px] text-center">
+                  {formatTimeArabic12(formData.opening_time)}
+                </span>
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-md">
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('opening_time', toggleTimeAmPm(formData.opening_time, 'AM'))}
+                    className={`px-2.5 py-1 text-xs rounded font-bold transition-all ${
+                      parseInt(formData.opening_time.split(':')[0] || '0', 10) < 12
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-white text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    ☀️ ص (صباحاً)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('opening_time', toggleTimeAmPm(formData.opening_time, 'PM'))}
+                    className={`px-2.5 py-1 text-xs rounded font-bold transition-all ${
+                      parseInt(formData.opening_time.split(':')[0] || '0', 10) >= 12
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-white text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    🌙 م (مساءً)
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Closing Time */}
             <div className="space-y-2">
-              <Label htmlFor="closing_time" className="text-sm font-medium">
+              <Label htmlFor="closing_time" className="text-sm font-medium block">
                 وقت الإغلاق
               </Label>
-              <Input
-                id="closing_time"
-                type="time"
-                value={formData.closing_time}
-                onChange={(e) => handleInputChange('closing_time', e.target.value)}
-                className="max-w-xs"
-                data-testid="input-closing-time"
-              />
+              <div className="flex flex-wrap items-center gap-3">
+                <Input
+                  id="closing_time"
+                  type="time"
+                  value={formData.closing_time}
+                  onChange={(e) => handleInputChange('closing_time', e.target.value)}
+                  className="w-36 text-center font-mono font-bold text-base"
+                  data-testid="input-closing-time"
+                />
+                <span className="px-3 py-1.5 bg-blue-100 text-blue-900 rounded-md text-sm font-bold border border-blue-200 min-w-[120px] text-center">
+                  {formatTimeArabic12(formData.closing_time)}
+                </span>
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-md">
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('closing_time', toggleTimeAmPm(formData.closing_time, 'AM'))}
+                    className={`px-2.5 py-1 text-xs rounded font-bold transition-all ${
+                      parseInt(formData.closing_time.split(':')[0] || '0', 10) < 12
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-white text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    ☀️ ص (صباحاً)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('closing_time', toggleTimeAmPm(formData.closing_time, 'PM'))}
+                    className={`px-2.5 py-1 text-xs rounded font-bold transition-all ${
+                      parseInt(formData.closing_time.split(':')[0] || '0', 10) >= 12
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-white text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    🌙 م (مساءً)
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Business Hours Preview */}
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium text-blue-900 mb-2">معاينة أوقات العمل</h4>
-              <p className="text-blue-800">
+              <h4 className="font-medium text-blue-900 mb-1 flex items-center gap-2">
+                <Clock className="h-4 w-4 text-blue-600" />
+                معاينة أوقات العمل
+              </h4>
+              <p className="text-blue-900 font-bold text-sm">
                 {formData.store_status === 'open' ? (
-                  <>المتجر مفتوح من الساعة {formData.opening_time} إلى {formData.closing_time}</>
+                  <>المتجر يفتح الساعة <span className="text-emerald-700 font-extrabold">{formatTimeArabic12(formData.opening_time)}</span> ويغلق الساعة <span className="text-purple-700 font-extrabold">{formatTimeArabic12(formData.closing_time)}</span></>
                 ) : (
-                  'المتجر مغلق حالياً'
+                  'المتجر مغلق حالياً بقرار الإدارة'
                 )}
               </p>
             </div>

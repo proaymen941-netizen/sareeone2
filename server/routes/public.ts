@@ -11,33 +11,43 @@ router.get("/app-status", async (req, res) => {
     const { opening, closing, status } = req.query;
     const openingTime = opening as string || '08:00';
     const closingTime = closing as string || '23:00';
-    const storeStatus = status as string || 'open';
+    const storeStatus = status as string || 'auto';
 
     if (storeStatus === 'closed') {
-      return res.json({ isOpen: false, message: "التطبيق مغلق حالياً من قِبل الإدارة", openingTime });
+      return res.json({ isOpen: false, message: "التطبيق مغلق حالياً من قِبل الإدارة", openingTime, closingTime });
     }
 
-    if (storeStatus === 'open') {
-      return res.json({ isOpen: true });
+    if (storeStatus === 'force_open') {
+      return res.json({ isOpen: true, message: "مفتوح بقرار الإدارة", openingTime, closingTime });
     }
 
     const now = new Date();
-    // الحصول على الوقت الحالي بتوقيت اليمن (UTC+3)
-    const yemenTime = new Date(now.getTime() + (3 * 60 * 60 * 1000));
-    const currentTime = yemenTime.toISOString().split('T')[1].slice(0, 5);
+    // الحصول على الوقت الحالي بتوقيت اليمن/السعودية (UTC+3)
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Riyadh',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const currentTime = formatter.format(now);
     
     const timeToMinutes = (t: string) => { 
       const [h, m] = t.split(':').map(Number); 
-      return h * 60 + m; 
+      return (h || 0) * 60 + (m || 0); 
     };
     
     const current = timeToMinutes(currentTime);
     const open = timeToMinutes(openingTime);
     const close = timeToMinutes(closingTime);
     
-    let appIsOpen = close > open 
-      ? (current >= open && current < close) 
-      : (current >= open || current < close);
+    let appIsOpen = false;
+    if (close > open) {
+      appIsOpen = current >= open && current < close;
+    } else if (close < open) {
+      appIsOpen = current >= open || current < close;
+    } else {
+      appIsOpen = true;
+    }
 
     if (!appIsOpen) {
       const isBeforeOpen = current < open;
@@ -45,11 +55,12 @@ router.get("/app-status", async (req, res) => {
       return res.json({ 
         isOpen: false, 
         message: `التطبيق مغلق حالياً. ${whenOpen}`,
-        openingTime 
+        openingTime,
+        closingTime
       });
     }
 
-    res.json({ isOpen: true });
+    res.json({ isOpen: true, message: `مفتوح حتى ${closingTime}`, openingTime, closingTime });
   } catch (error) {
     res.status(500).json({ isOpen: false, message: "خطأ في التحقق من حالة التطبيق" });
   }

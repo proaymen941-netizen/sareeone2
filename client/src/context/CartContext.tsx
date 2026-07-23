@@ -181,8 +181,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const appStatus = useMemo(() => {
     const openingTime = getSetting('opening_time') || '08:00';
     const closingTime = getSetting('closing_time') || '23:00';
-    const storeStatus = getSetting('store_status') || 'open';
-    return getAppStatus(openingTime, closingTime, storeStatus);
+    const storeStatus = getSetting('store_status') || 'auto';
+    const storeEmergencyClosed = getSetting('store_emergency_closed', 'false');
+    const emergencyMessage = getSetting('store_emergency_message', '');
+    const workingDays = getSetting('working_days', '0,1,2,3,4,5,6');
+    return getAppStatus(openingTime, closingTime, storeStatus, storeEmergencyClosed, emergencyMessage, workingDays);
   }, [getSetting]);
 
   // حفظ السلة في localStorage

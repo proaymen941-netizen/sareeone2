@@ -24,6 +24,34 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
+function formatTimeArabic12(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  if (isNaN(h)) return timeStr;
+  const period = h >= 12 ? 'م (مساءً)' : 'ص (صباحاً)';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${m} ${period}`;
+}
+
+function toggleTimeAmPm(timeStr: string, targetPeriod: 'AM' | 'PM'): string {
+  if (!timeStr) return '08:00';
+  const parts = timeStr.split(':');
+  let h = parseInt(parts[0], 10);
+  const m = parts[1] || '00';
+  if (isNaN(h)) return timeStr;
+
+  if (targetPeriod === 'AM') {
+    if (h >= 12) h = h - 12;
+  } else {
+    if (h < 12) h = h + 12;
+  }
+  const hStr = h.toString().padStart(2, '0');
+  return `${hStr}:${m}`;
+}
+
 export function UiControlPanel() {
   const { settings, loading, updateSetting, isFeatureEnabled, getSetting } = useUiSettings();
   const [localSettings, setLocalSettings] = useState<Record<string, string>>({});
@@ -163,25 +191,90 @@ export function UiControlPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>وقت الفتح (مثال: 08:00)</Label>
-              <div className="flex gap-2">
+              <Label>وقت الفتح</Label>
+              <div className="flex flex-wrap items-center gap-2">
                 <Input 
-                  value={localSettings['opening_time'] || ''} 
+                  type="time"
+                  value={localSettings['opening_time'] || '08:00'} 
                   onChange={(e) => handleInputChange('opening_time', e.target.value)}
-                  placeholder="08:00"
+                  className="w-32 text-center font-mono font-bold"
                 />
-                <Button onClick={() => handleSaveSetting('opening_time')}>حفظ</Button>
+                <span className="px-2 py-1 bg-orange-100 text-orange-900 rounded text-xs font-bold border border-orange-200">
+                  {formatTimeArabic12(localSettings['opening_time'] || '08:00')}
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={parseInt((localSettings['opening_time'] || '08:00').split(':')[0], 10) < 12 ? 'default' : 'outline'}
+                    onClick={() => {
+                      const val = toggleTimeAmPm(localSettings['opening_time'] || '08:00', 'AM');
+                      handleInputChange('opening_time', val);
+                      handleSaveSetting('opening_time');
+                    }}
+                    className="text-xs px-2 py-1 h-7"
+                  >
+                    ☀️ ص
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={parseInt((localSettings['opening_time'] || '08:00').split(':')[0], 10) >= 12 ? 'default' : 'outline'}
+                    onClick={() => {
+                      const val = toggleTimeAmPm(localSettings['opening_time'] || '08:00', 'PM');
+                      handleInputChange('opening_time', val);
+                      handleSaveSetting('opening_time');
+                    }}
+                    className="text-xs px-2 py-1 h-7"
+                  >
+                    🌙 م
+                  </Button>
+                </div>
+                <Button size="sm" onClick={() => handleSaveSetting('opening_time')}>حفظ</Button>
               </div>
             </div>
+
             <div className="space-y-2">
-              <Label>وقت الإغلاق (مثال: 23:00)</Label>
-              <div className="flex gap-2">
+              <Label>وقت الإغلاق</Label>
+              <div className="flex flex-wrap items-center gap-2">
                 <Input 
-                  value={localSettings['closing_time'] || ''} 
+                  type="time"
+                  value={localSettings['closing_time'] || '23:00'} 
                   onChange={(e) => handleInputChange('closing_time', e.target.value)}
-                  placeholder="23:00"
+                  className="w-32 text-center font-mono font-bold"
                 />
-                <Button onClick={() => handleSaveSetting('closing_time')}>حفظ</Button>
+                <span className="px-2 py-1 bg-orange-100 text-orange-900 rounded text-xs font-bold border border-orange-200">
+                  {formatTimeArabic12(localSettings['closing_time'] || '23:00')}
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={parseInt((localSettings['closing_time'] || '23:00').split(':')[0], 10) < 12 ? 'default' : 'outline'}
+                    onClick={() => {
+                      const val = toggleTimeAmPm(localSettings['closing_time'] || '23:00', 'AM');
+                      handleInputChange('closing_time', val);
+                      handleSaveSetting('closing_time');
+                    }}
+                    className="text-xs px-2 py-1 h-7"
+                  >
+                    ☀️ ص
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={parseInt((localSettings['closing_time'] || '23:00').split(':')[0], 10) >= 12 ? 'default' : 'outline'}
+                    onClick={() => {
+                      const val = toggleTimeAmPm(localSettings['closing_time'] || '23:00', 'PM');
+                      handleInputChange('closing_time', val);
+                      handleSaveSetting('closing_time');
+                    }}
+                    className="text-xs px-2 py-1 h-7"
+                  >
+                    🌙 م
+                  </Button>
+                </div>
+                <Button size="sm" onClick={() => handleSaveSetting('closing_time')}>حفظ</Button>
               </div>
             </div>
           </div>

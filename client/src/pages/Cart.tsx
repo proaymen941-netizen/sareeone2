@@ -99,8 +99,9 @@ export default function Cart() {
   const driverHours = useMemo(() => {
     const start = (settings as any[])?.find((s: any) => s.key === 'driver_start_time')?.value || '09:00';
     const end = (settings as any[])?.find((s: any) => s.key === 'driver_end_time')?.value || '21:00';
+    const driverHoursEnabled = (settings as any[])?.find((s: any) => s.key === 'enable_driver_hours')?.value === 'true';
     const enabled = (settings as any[])?.find((s: any) => s.key === 'enable_scheduled_orders')?.value !== 'false';
-    return { start, end, scheduledOrdersEnabled: enabled };
+    return { start, end, driverHoursEnabled, scheduledOrdersEnabled: enabled };
   }, [settings]);
 
   const restaurantStatus = useMemo(() => {
@@ -281,8 +282,8 @@ export default function Cart() {
       return;
     }
 
-    // فحص ساعات عمل الموصلين - إذا كانوا غير متاحين اعرض حوار الجدولة
-    if (driverHours.scheduledOrdersEnabled && orderForm.deliveryTime === 'now') {
+    // فحص ساعات عمل الموصلين - معطلة افتراضياً للطلبات الفورية
+    if (driverHours.driverHoursEnabled && driverHours.scheduledOrdersEnabled && orderForm.deliveryTime === 'now') {
       const driversAvailable = isDriverAvailable(driverHours.start, driverHours.end);
       if (!driversAvailable) {
         setShowScheduledDialog(true);

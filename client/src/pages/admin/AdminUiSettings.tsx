@@ -100,7 +100,7 @@ interface SettingRowProps {
   label: string;
   description?: string;
   settingKey: string;
-  type?: 'text' | 'boolean' | 'image' | 'textarea';
+  type?: 'text' | 'boolean' | 'image' | 'textarea' | 'time';
   placeholder?: string;
   rows?: number;
   value: string;
@@ -109,6 +109,103 @@ interface SettingRowProps {
   onBlurSave: (key: string, v: string) => void;
   onToggle: (key: string, checked: boolean) => void;
   onImageChange: (key: string, url: string) => void;
+}
+
+function formatTimeArabic12(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  if (isNaN(h)) return timeStr;
+  const period = h >= 12 ? 'م (مساءً)' : 'ص (صباحاً)';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${m} ${period}`;
+}
+
+function toggleTimeAmPm(timeStr: string, targetPeriod: 'AM' | 'PM'): string {
+  if (!timeStr) return '08:00';
+  const parts = timeStr.split(':');
+  let h = parseInt(parts[0], 10);
+  const m = parts[1] || '00';
+  if (isNaN(h)) return timeStr;
+
+  if (targetPeriod === 'AM') {
+    if (h >= 12) h = h - 12;
+  } else {
+    if (h < 12) h = h + 12;
+  }
+  const hStr = h.toString().padStart(2, '0');
+  return `${hStr}:${m}`;
+}
+
+function StableTimeInput({
+  value: externalValue,
+  onBlurSave,
+  onChange,
+}: {
+  value: string;
+  onBlurSave: (value: string) => void;
+  onChange: (value: string) => void;
+}) {
+  const [localValue, setLocalValue] = useState(externalValue || '08:00');
+  const isFocused = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused.current) {
+      setLocalValue(externalValue || '08:00');
+    }
+  }, [externalValue]);
+
+  const handleTimeChange = (val: string) => {
+    setLocalValue(val);
+    onChange(val);
+  };
+
+  const handleToggleAmPm = (targetPeriod: 'AM' | 'PM') => {
+    const newVal = toggleTimeAmPm(localValue, targetPeriod);
+    setLocalValue(newVal);
+    onChange(newVal);
+    onBlurSave(newVal);
+  };
+
+  const hour = parseInt(localValue.split(':')[0] || '0', 10);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        type="time"
+        value={localValue}
+        onChange={(e) => handleTimeChange(e.target.value)}
+        onFocus={() => { isFocused.current = true; }}
+        onBlur={() => { isFocused.current = false; onBlurSave(localValue); }}
+        className="w-32 text-center font-mono font-bold text-sm"
+      />
+      <span className="px-2.5 py-1 bg-orange-100 text-orange-900 rounded text-xs font-bold border border-orange-200">
+        {formatTimeArabic12(localValue)}
+      </span>
+      <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded">
+        <button
+          type="button"
+          onClick={() => handleToggleAmPm('AM')}
+          className={`px-2 py-0.5 text-xs rounded font-bold transition-all ${
+            hour < 12 ? 'bg-emerald-600 text-white shadow-xs' : 'bg-white text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          ☀️ ص
+        </button>
+        <button
+          type="button"
+          onClick={() => handleToggleAmPm('PM')}
+          className={`px-2 py-0.5 text-xs rounded font-bold transition-all ${
+            hour >= 12 ? 'bg-purple-600 text-white shadow-xs' : 'bg-white text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          🌙 م
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function SettingRow({
@@ -139,6 +236,12 @@ function SettingRow({
               bucket="ui-settings"
             />
           </div>
+        ) : type === 'time' ? (
+          <StableTimeInput
+            value={value}
+            onChange={(v) => onTextChange(settingKey, v)}
+            onBlurSave={(v) => onBlurSave(settingKey, v)}
+          />
         ) : type === 'textarea' ? (
           <StableTextarea
             value={value}
@@ -738,8 +841,8 @@ export default function AdminUiSettings() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="divide-y divide-gray-100 pt-3">
-                <SettingRow label="وقت فتح المتجر يومياً" {...rowProps('opening_time')} placeholder="08:00" description="ساعة بدء استقبال الطلبات (تنسيق 24 ساعة، مثال: 08:00)" />
-                <SettingRow label="وقت إغلاق المتجر يومياً" {...rowProps('closing_time')} placeholder="23:00" description="ساعة التوقف عن استقبال الطلبات (مثال: 23:00)" />
+                <SettingRow label="وقت فتح المتجر يومياً" {...rowProps('opening_time')} type="time" placeholder="08:00" description="ساعة بدء استقبال الطلبات (تنسيق 12 ساعة مع م/ص)" />
+                <SettingRow label="وقت إغلاق المتجر يومياً" {...rowProps('closing_time')} type="time" placeholder="23:00" description="ساعة التوقف عن استقبال الطلبات (تنسيق 12 ساعة مع م/ص)" />
                 <SettingRow label="أيام العمل الرسمية" {...rowProps('working_days')} placeholder="0,1,2,3,4,5,6" description="أرقام الأيام المفصولة بفواصل (0=الأحد، 1=الإثنين، ... 6=السبت)" />
               </CardContent>
             </Card>
@@ -834,25 +937,6 @@ export default function AdminUiSettings() {
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* ساعات دوام الموصلين والطلبات المؤجلة */}
-            <Card className="shadow-sm">
-              <CardHeader className="bg-purple-50/40 border-b border-purple-100">
-                <CardTitle className="text-base flex items-center gap-2 text-purple-900 font-bold">
-                  <Truck className="h-5 w-5 text-purple-600" />
-                  ساعات دوام الموصلين والطلبات المؤجلة
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="divide-y divide-gray-100 pt-3">
-                <div className="py-2.5 bg-purple-50 rounded-lg px-3 mb-2 text-xs text-purple-800">
-                  💡 عند طلب العميل خارج ساعات الموصلين، يطلب منه النظام تحديد وقت جدولة مؤجل ضمن أوقات الدوام المتاحة.
-                </div>
-                <SettingRow label="تفعيل ساعات دوام الموصلين" {...rowProps('enable_driver_hours')} type="boolean" description="تطبيق قيود ساعات دوام الموصلين عند إرسال الطلبات" />
-                <SettingRow label="بداية دوام الموصلين" {...rowProps('driver_start_time')} placeholder="09:00" description="الوقت الذي يبدأ فيه الموصلون العمل (مثال: 09:00)" />
-                <SettingRow label="نهاية دوام الموصلين" {...rowProps('driver_end_time')} placeholder="21:00" description="الوقت الذي ينتهي فيه دوام الموصلين (مثال: 21:00)" />
-                <SettingRow label="تفعيل الطلبات المؤجلة (الجدولة)" {...rowProps('enable_scheduled_orders')} type="boolean" description="السماح للعملاء بجدولة طلباتهم خارج ساعات الموصلين" />
               </CardContent>
             </Card>
 

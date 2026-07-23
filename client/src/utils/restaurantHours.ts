@@ -202,7 +202,7 @@ export function getAppStatus(
     };
   }
 
-  if (storeStatus === 'open') {
+  if (storeStatus === 'force_open') {
     return {
       isOpen: true,
       message: 'مفتوح',
@@ -212,7 +212,23 @@ export function getAppStatus(
   }
 
   const now = new Date();
-  const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
+
+  // Get current HH:MM and day in Yemen/Saudi timezone (Asia/Riyadh, UTC+3)
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Riyadh',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const currentTime = formatter.format(now);
+
+  const dayFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Riyadh',
+    weekday: 'short'
+  });
+  // Map day string to 0=Sun..6=Sat
+  const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const currentDay = dayMap[dayFormatter.format(now)] ?? now.getDay();
 
   if (workingDays) {
     const daysArr = workingDays.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
@@ -226,7 +242,6 @@ export function getAppStatus(
     }
   }
 
-  const currentTime = now.toTimeString().slice(0, 5);
   const currentMinutes = timeToMinutes(currentTime);
   const openMinutes = timeToMinutes(openingTime);
   const closeMinutes = timeToMinutes(closingTime);
@@ -234,8 +249,10 @@ export function getAppStatus(
   let isOpen = false;
   if (closeMinutes > openMinutes) {
     isOpen = currentMinutes >= openMinutes && currentMinutes < closeMinutes;
-  } else {
+  } else if (closeMinutes < openMinutes) {
     isOpen = currentMinutes >= openMinutes || currentMinutes < closeMinutes;
+  } else {
+    isOpen = true; // 24 hours
   }
 
   if (isOpen) {
