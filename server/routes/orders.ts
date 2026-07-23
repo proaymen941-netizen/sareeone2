@@ -67,13 +67,37 @@ router.post("/", async (req, res) => {
     try {
       const allSettings = await storage.getUiSettings();
       const settingsMap = new Map(allSettings.map((s: any) => [s.key, s.value]));
+      
+      // 1. فحص الإغلاق الطارئ
+      const emergencyClosed = settingsMap.get('store_emergency_closed') === 'true';
+      const emergencyMsg = settingsMap.get('store_emergency_message') || 'عذراً، المتجر مغلق حالياً بصفة طارئة لأعمال الصيانة والتحديث. سنعود للعمل قريباً!';
       const storeStatus = settingsMap.get('store_status');
+
+      if (emergencyClosed || storeStatus === 'emergency') {
+        return res.status(400).json({ 
+          error: emergencyMsg,
+          code: "APP_EMERGENCY_CLOSED",
+          message: emergencyMsg
+        });
+      }
+
+      // 2. فحص الحد الأدنى للطلب
+      const minOrderEnabled = settingsMap.get('minimum_order_enabled') === 'true';
+      const minOrderDefault = parseFloat(settingsMap.get('minimum_order_default') || '0');
+      const subtotalVal = parseFloat(subtotal || '0');
+
+      if (minOrderEnabled && minOrderDefault > 0 && subtotalVal < minOrderDefault) {
+        return res.status(400).json({ 
+          error: `الحد الأدنى للطلب هو ${minOrderDefault} ريال. مجموع سلتك الحالي (${subtotalVal} ريال) أقل من الحد الأدنى.`
+        });
+      }
+
+      // 3. فحص أوقات عمل المتجر الأساسية
       const openingTime = settingsMap.get('opening_time') || '08:00';
       const closingTime = settingsMap.get('closing_time') || '23:00';
       const allowScheduledWhenClosed = settingsMap.get('allow_scheduled_orders_when_closed') !== 'false';
 
       if (storeStatus === 'closed') {
-        // التحقق من الإعداد إذا كان مسموحاً بالطلبات المجدولة عند إغلاق التطبيق
         if (!isScheduledOrder || !allowScheduledWhenClosed) {
           return res.status(400).json({ 
             error: "التطبيق مغلق حالياً من قِبل الإدارة",
@@ -81,14 +105,7 @@ router.post("/", async (req, res) => {
             message: "التطبيق مغلق حالياً من قِبل الإدارة"
           });
         }
-        // الطلبات المجدولة مسموح بها فقط إذا كان الإعداد مفعلاً
-      }
-
-      // إذا كان المتجر مفتوحاً يدوياً، نتجاوز فحص الوقت تماماً
-      if (storeStatus === 'open') {
-        // المتجر مفتوح يدوياً - لا فحص للوقت
-      } else if (!isScheduledOrder) {
-        // الطلبات المؤجلة لا تحتاج فحص ساعات العمل الحالية
+      } else if (storeStatus !== 'open' && !isScheduledOrder) {
         const now = new Date();
         const currentTime = now.toTimeString().slice(0, 5);
         const timeToMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
@@ -103,6 +120,33 @@ router.post("/", async (req, res) => {
           return res.status(400).json({ 
             error: `التطبيق مغلق حالياً. ${whenOpen}`
           });
+        }
+      }
+
+      // 4. فحص ساعات دوام الموصلين
+      const enableDriverHours = settingsMap.get('enable_driver_hours') === 'true';
+      if (enableDriverHours && !isScheduledOrder) {
+        const driverStart = settingsMap.get('driver_start_time') || '09:00';
+        const driverEnd = settingsMap.get('driver_end_time') || '21:00';
+        const nowTime = new Date().toTimeString().slice(0, 5);
+        const t2m = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+        const nowM = t2m(nowTime);
+        const startM = t2m(driverStart);
+        const endM = t2m(driverEnd);
+        let inDriverHours = endM > startM ? (nowM >= startM && nowM < endM) : (nowM >= startM || nowM < endM);
+
+        if (!inDriverHours) {
+          const enableScheduled = settingsMap.get('enable_scheduled_orders') === 'true';
+          if (enableScheduled) {
+            return res.status(400).json({ 
+              error: `خدمة التوصيل الفورية مغلقة حالياً (ساعات العمل من ${driverStart} إلى ${driverEnd}). يمكنك اختيار الطلب المجدول لوقت متاح.`,
+              code: "DRIVER_HOURS_CLOSED_CAN_SCHEDULE"
+            });
+          } else {
+            return res.status(400).json({ 
+              error: `خدمة التوصيل مغلقة حالياً (ساعات عمل الموصلين من ${driverStart} إلى ${driverEnd}).`
+            });
+          }
         }
       }
     } catch (_) {
@@ -140,12 +184,25 @@ router.post("/", async (req, res) => {
         distance = feeResult.distance;
       } catch (feeError) {
         console.error("Error calculating delivery fee during order creation:", feeError);
-        // Fallback to client fee if service fails
       }
     }
 
-    // إنشاء رقم طلب فريد
-    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // إنشاء رقم طلب فريد تسلسلي
+    let orderNumber;
+    try {
+      const allSettings = await storage.getUiSettings();
+      const settingsMap = new Map(allSettings.map((s: any) => [s.key, s.value]));
+      const prefix = settingsMap.get('order_number_prefix') || 'ORD-';
+      const startNum = parseInt(settingsMap.get('order_number_start') || '1001', 10);
+      const digits = parseInt(settingsMap.get('order_number_digits') || '4', 10);
+
+      const existingOrders = await storage.getOrders();
+      const count = existingOrders ? existingOrders.length : 0;
+      const nextSeq = startNum + count;
+      orderNumber = `${prefix}${String(nextSeq).padStart(digits, '0')}`;
+    } catch (_) {
+      orderNumber = `ORD-${Date.now()}`;
+    }
 
     // التأكد من أن العناصر هي JSON string
     let itemsString;

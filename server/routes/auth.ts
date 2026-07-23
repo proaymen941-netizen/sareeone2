@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { dbStorage } from '../db';
 import { adminUsers, drivers, users, insertUserSchema } from '@shared/schema';
-import { eq, or, sql } from 'drizzle-orm';
+import { eq, or, ilike, sql } from 'drizzle-orm';
 
 const router = express.Router();
 
@@ -86,8 +86,9 @@ router.post('/login', async (req, res) => {
 
     console.log('🔐 محاولة تسجيل دخول عميل:', identifier);
 
-    // البحث عن العميل في قاعدة البيانات (باسم المستخدم أو الهاتف أو البريد)
-    // ندعم: المطابقة مع الفراغات أو بدونها، وحالة الأحرف للبريد
+    // البحث عن العميل في قاعدة البيانات (باسم المستخدم أو الاسم الكامل أو الهاتف أو البريد)
+    // ندعم: المطابقة مع الاسم، اسم المستخدم، رقم الهاتف، والبريد الإلكتروني
+    const trimmedRaw = String(rawIdentifier).trim();
     const userResult = await dbStorage.db
       .select()
       .from(users)
@@ -95,8 +96,13 @@ router.post('/login', async (req, res) => {
         or(
           eq(users.username, identifier),
           eq(users.username, identifierNoSpaces),
+          eq(users.username, trimmedRaw),
           eq(users.phone, identifier),
           eq(users.phone, identifierNoSpaces),
+          eq(users.name, trimmedRaw),
+          eq(users.name, identifier),
+          ilike(users.name, trimmedRaw),
+          ilike(users.name, identifier),
           eq(users.email, identifier),
           eq(users.email, identifierLower)
         )
@@ -265,8 +271,13 @@ router.post('/register', async (req, res) => {
       s.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
        .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
 
+    if (validatedData.name) {
+      validatedData.name = String(validatedData.name).trim();
+    }
     if (validatedData.username) {
-      validatedData.username = arabicToLatinDigits(String(validatedData.username).trim()).replace(/\s+/g, '');
+      validatedData.username = String(validatedData.username).trim();
+    } else if (validatedData.name) {
+      validatedData.username = validatedData.name;
     }
     if (validatedData.phone) {
       validatedData.phone = arabicToLatinDigits(String(validatedData.phone).trim()).replace(/\s+/g, '');
@@ -274,26 +285,18 @@ router.post('/register', async (req, res) => {
     if (validatedData.email) {
       validatedData.email = String(validatedData.email).trim().toLowerCase();
     }
-    if (validatedData.name) {
-      validatedData.name = String(validatedData.name).trim();
-    }
 
-    // التحقق من وجود المستخدم مسبقاً
-    const existingUser = await dbStorage.db
+    // التحقق من وجود رقم الهاتف مسبقاً
+    const existingPhoneUser = await dbStorage.db
       .select()
       .from(users)
-      .where(
-        or(
-          validatedData.username ? eq(users.username, validatedData.username) : undefined,
-          validatedData.phone ? eq(users.phone, validatedData.phone) : undefined
-        )
-      )
+      .where(validatedData.phone ? eq(users.phone, validatedData.phone) : undefined)
       .limit(1);
 
-    if (existingUser.length > 0) {
+    if (existingPhoneUser.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'اسم المستخدم أو رقم الهاتف مسجل مسبقاً'
+        message: 'رقم الهاتف مسجل مسبقاً لحساب آخر'
       });
     }
 

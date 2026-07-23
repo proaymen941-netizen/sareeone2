@@ -443,7 +443,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       items: [
         { icon: Store, label: 'إدارة المتاجر', path: '/admin/restaurants', permission: 'manage_menu' },
         { icon: Layers, label: 'أقسام المتجر', path: '/admin/restaurant-sections', permission: 'manage_menu' },
-        { icon: Clock, label: 'ساعات العمل', path: '/admin/business-hours', permission: 'manage_menu' },
         { icon: Receipt, label: 'حسابات المتاجر', path: '/admin/restaurant-accounts', permission: 'manage_menu' },
       ].filter(item => hasPermission(item.permission))
     },

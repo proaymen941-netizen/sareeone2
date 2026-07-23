@@ -43,7 +43,8 @@ import {
   driverTransactions,
   driverCommissions,
   driverWithdrawals,
-  auditLogs
+  auditLogs,
+  wasalniRequests
 } from "@shared/schema";
 import { DatabaseStorage } from "../db";
 import { coerceRequestData } from "../utils/coercion";
@@ -1615,13 +1616,22 @@ router.get("/financial-reports", async (req, res) => {
     const completedWithdrawals = filteredWithdrawals.filter(w => w.status === 'completed');
     const driverPayments = completedWithdrawals.reduce((sum, w) => sum + parseFloat(w.amount.toString()), 0);
     
+    // جلب الخرجيات والمصروفات الإدارية
+    let totalAppExpenses = 0;
+    try {
+      const expensesRes = await db.execute(sql`SELECT * FROM app_expenses`);
+      const rows = expensesRes.rows || expensesRes;
+      totalAppExpenses = rows.reduce((s: number, r: any) => s + parseFloat(r.amount || '0'), 0);
+    } catch (_) {}
+
     // إنشاء التقرير
     const report = {
       id: "rep_" + Date.now(),
       period: type === 'monthly' ? fromDate.toLocaleDateString('ar-YE', { month: 'long', year: 'numeric' }) : "الفترة المختارة",
       totalRevenue,
-      totalExpenses: driverPayments + restaurantPayments,
-      netProfit: platformFees,
+      totalExpenses: driverPayments + restaurantPayments + totalAppExpenses,
+      totalAppExpenses,
+      netProfit: platformFees + deliveryFees - totalAppExpenses,
       commissionEarned: platformFees,
       deliveryFees,
       platformFees,
@@ -1643,6 +1653,77 @@ router.get("/financial-reports", async (req, res) => {
   } catch (error) {
     console.error("خطأ في جلب التقارير المالية:", error);
     res.status(500).json({ error: "خطأ في الخادم" });
+  }
+});
+
+// ===== إدارة الخرجيات والمصروفات Operational Expenses =====
+
+router.get("/expenses", async (req, res) => {
+  try {
+    const expensesList = await db.execute(sql`SELECT * FROM app_expenses ORDER BY expense_date DESC`);
+    const rows = expensesList.rows || expensesList;
+    res.json(rows.map((row: any) => ({
+      id: row.id,
+      title: row.title,
+      category: row.category,
+      amount: parseFloat(row.amount || '0'),
+      expenseDate: row.expense_date || row.expenseDate,
+      notes: row.notes || '',
+      recipient: row.recipient || '',
+      documents: row.documents ? (typeof row.documents === 'string' ? JSON.parse(row.documents) : row.documents) : [],
+      createdBy: row.created_by || row.createdBy || 'المدير العام',
+      createdAt: row.created_at || row.createdAt,
+    })));
+  } catch (error) {
+    console.error("خطأ في جلب المصروفات:", error);
+    res.status(500).json({ error: "خطأ في الخادم" });
+  }
+});
+
+router.post("/expenses", async (req, res) => {
+  try {
+    const { title, category, amount, expenseDate, notes, recipient, documents, createdBy } = req.body;
+    if (!title || amount === undefined || amount === null) {
+      return res.status(400).json({ error: "البيان والمبلغ مطلوبة" });
+    }
+
+    const docsJson = JSON.stringify(Array.isArray(documents) ? documents : []);
+    const dateVal = expenseDate ? new Date(expenseDate) : new Date();
+    const userVal = createdBy || (req as any).user?.name || 'المدير العام';
+
+    const result = await db.execute(sql`
+      INSERT INTO app_expenses (title, category, amount, expense_date, notes, recipient, documents, created_by)
+      VALUES (${title}, ${category || 'operational'}, ${amount}, ${dateVal}, ${notes || ''}, ${recipient || ''}, ${docsJson}, ${userVal})
+      RETURNING *
+    `);
+
+    const row: any = (result.rows || result)[0];
+    res.json({
+      id: row.id,
+      title: row.title,
+      category: row.category,
+      amount: parseFloat(row.amount || '0'),
+      expenseDate: row.expense_date,
+      notes: row.notes,
+      recipient: row.recipient,
+      documents: row.documents ? JSON.parse(row.documents) : [],
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+    });
+  } catch (error) {
+    console.error("خطأ في إضافة المصروفات:", error);
+    res.status(500).json({ error: "فشل إضافة المصروفات" });
+  }
+});
+
+router.delete("/expenses/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.execute(sql`DELETE FROM app_expenses WHERE id = ${id}`);
+    res.json({ success: true, message: "تم حذف البند بنجاح" });
+  } catch (error) {
+    console.error("خطأ في حذف المصروفات:", error);
+    res.status(500).json({ error: "فشل حذف البند" });
   }
 });
 
@@ -2383,20 +2464,54 @@ router.delete("/payment-methods/:id/documents/:docId", async (req, res) => {
 
 router.post("/orders/reset-numbers", async (req, res) => {
   try {
+    const allSettings = await storage.getUiSettings();
+    const settingsMap = new Map(allSettings.map((s: any) => [s.key, s.value]));
+    const prefix = req.body.prefix !== undefined ? req.body.prefix : (settingsMap.get('order_number_prefix') || 'ORD-');
+    const startNum = parseInt(req.body.startNumber || settingsMap.get('order_number_start') || '1001', 10);
+    const digits = parseInt(req.body.digits || settingsMap.get('order_number_digits') || '4', 10);
+
     const allOrders = await storage.getOrders();
     const sorted = [...allOrders].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
-    const prefix = req.body.prefix || '';
+
     for (let i = 0; i < sorted.length; i++) {
-      const newNumber = `${prefix}${String(i + 1).padStart(4, '0')}`;
+      const seq = startNum + i;
+      const newNumber = `${prefix}${String(seq).padStart(digits, '0')}`;
       await db.update(orders)
         .set({ orderNumber: newNumber })
         .where(eq(orders.id, sorted[i].id));
     }
-    res.json({ success: true, message: `تم إعادة تسلسل ${sorted.length} طلب بنجاح` });
+    res.json({ success: true, message: `تم إعادة تسلسل ${sorted.length} طلب للمتاجر بنجاح` });
   } catch (error) {
-    console.error("خطأ في إعادة تسلسل أرقام الطلبات:", error);
+    console.error("خطأ في إعادة تسلسل أرقام طلبات المتاجر:", error);
+    res.status(500).json({ error: "خطأ في الخادم" });
+  }
+});
+
+router.post("/wasalni/reset-numbers", async (req, res) => {
+  try {
+    const allSettings = await storage.getUiSettings();
+    const settingsMap = new Map(allSettings.map((s: any) => [s.key, s.value]));
+    const prefix = req.body.prefix !== undefined ? req.body.prefix : (settingsMap.get('wasalni_number_prefix') || 'WSL-');
+    const startNum = parseInt(req.body.startNumber || settingsMap.get('wasalni_number_start') || '1001', 10);
+    const digits = parseInt(req.body.digits || settingsMap.get('wasalni_number_digits') || '4', 10);
+
+    const allWasalni = await db.select().from(wasalniRequests);
+    const sorted = [...allWasalni].sort(
+      (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+
+    for (let i = 0; i < sorted.length; i++) {
+      const seq = startNum + i;
+      const newNumber = `${prefix}${String(seq).padStart(digits, '0')}`;
+      await db.update(wasalniRequests)
+        .set({ requestNumber: newNumber })
+        .where(eq(wasalniRequests.id, sorted[i].id));
+    }
+    res.json({ success: true, message: `تم إعادة تسلسل ${sorted.length} طلب لوصل لي بنجاح` });
+  } catch (error) {
+    console.error("خطأ في إعادة تسلسل أرقام طلبات وصل لي:", error);
     res.status(500).json({ error: "خطأ في الخادم" });
   }
 });
@@ -2625,15 +2740,21 @@ router.delete("/sub-admins/:id", requirePermission('manage_admins'), async (req,
   }
 });
 
-// ===== Security Logging Routes =====
+// ===== Security Logging & Settings Routes =====
 
 router.get("/security/settings", async (req, res) => {
   try {
+    const allSettings = await storage.getUiSettings();
+    const map = new Map(allSettings.map((s: any) => [s.key, s.value]));
+
     res.json({
-      twoFactorEnabled: false,
-      sessionTimeout: 60,
-      passwordComplexity: 'medium',
-      ipWhitelist: [],
+      twoFactorEnabled: map.get('sec_two_factor') === 'true',
+      sessionTimeout: parseInt(map.get('sec_session_timeout') || '60', 10),
+      passwordComplexity: map.get('sec_password_complexity') || 'medium',
+      ipWhitelist: map.get('sec_ip_whitelist') ? map.get('sec_ip_whitelist')!.split(',').filter(Boolean) : [],
+      maxLoginAttempts: parseInt(map.get('sec_max_login_attempts') || '5', 10),
+      forceSsl: map.get('sec_force_ssl') !== 'false',
+      loginNotifications: map.get('sec_login_notifications') === 'true',
       lastAudit: new Date().toISOString(),
     });
   } catch (error) {
@@ -2641,9 +2762,84 @@ router.get("/security/settings", async (req, res) => {
   }
 });
 
+router.post("/security/settings", async (req, res) => {
+  try {
+    const { twoFactorEnabled, sessionTimeout, passwordComplexity, ipWhitelist, maxLoginAttempts, forceSsl, loginNotifications } = req.body;
+
+    const settingsToSave = [
+      { key: 'sec_two_factor', value: String(!!twoFactorEnabled) },
+      { key: 'sec_session_timeout', value: String(sessionTimeout || 60) },
+      { key: 'sec_password_complexity', value: passwordComplexity || 'medium' },
+      { key: 'sec_ip_whitelist', value: Array.isArray(ipWhitelist) ? ipWhitelist.join(',') : (ipWhitelist || '') },
+      { key: 'sec_max_login_attempts', value: String(maxLoginAttempts || 5) },
+      { key: 'sec_force_ssl', value: String(forceSsl !== false) },
+      { key: 'sec_login_notifications', value: String(!!loginNotifications) },
+    ];
+
+    for (const s of settingsToSave) {
+      await storage.upsertUiSetting(s);
+    }
+
+    res.json({ success: true, message: "تم حفظ إعدادات الأمان بنجاح" });
+  } catch (error) {
+    console.error("خطأ في حفظ إعدادات الأمان:", error);
+    res.status(500).json({ error: "فشل حفظ إعدادات الأمان" });
+  }
+});
+
+router.post("/security/change-password", async (req, res) => {
+  try {
+    const { currentPassword, newPassword, adminId } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: "كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل" });
+    }
+
+    const targetAdminId = adminId || (req as any).user?.id;
+    if (!targetAdminId) {
+      return res.status(400).json({ error: "معرف المدير غير محدد" });
+    }
+
+    const [admin] = await db.select().from(adminUsers).where(eq(adminUsers.id, targetAdminId)).limit(1);
+    if (!admin) {
+      return res.status(404).json({ error: "حساب المدير غير موجود" });
+    }
+
+    // التحديث المباشر لكلمة المرور
+    await db.update(adminUsers)
+      .set({ password: newPassword })
+      .where(eq(adminUsers.id, targetAdminId));
+
+    // تسجيل الحدث الأمني
+    await db.insert(auditLogs).values({
+      adminId: targetAdminId,
+      action: 'password_change',
+      entityType: 'auth',
+      entityId: targetAdminId,
+      ipAddress: req.ip || 'unknown',
+      oldData: JSON.stringify({ action: 'تغيير كلمة المرور' }),
+      newData: JSON.stringify({ status: 'success' }),
+    });
+
+    res.json({ success: true, message: "تم تغيير كلمة المرور بنجاح" });
+  } catch (error) {
+    console.error("خطأ في تغيير كلمة المرور:", error);
+    res.status(500).json({ error: "فشل تغيير كلمة المرور" });
+  }
+});
+
+router.post("/security/clear-logs", async (req, res) => {
+  try {
+    await db.delete(auditLogs).where(sql`${auditLogs.entityType} = 'auth'`);
+    res.json({ success: true, message: "تم مسح سجلات الوصول الأمني بنجاح" });
+  } catch (error) {
+    console.error("خطأ في مسح سجلات الأمان:", error);
+    res.status(500).json({ error: "فشل مسح السجلات" });
+  }
+});
+
 router.get("/security/logs", async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
+    const limit = parseInt(req.query.limit as string) || 100;
     const logs = await db
       .select({
         id: auditLogs.id,
@@ -2671,10 +2867,10 @@ router.get("/security/logs", async (req, res) => {
     const formatted = logs.map(log => ({
       id: log.id,
       userId: log.adminId,
-      userName: adminMap[log.adminId] || 'مستخدم',
-      action: log.action === 'login' ? 'تسجيل الدخول' : log.action === 'logout' ? 'تسجيل الخروج' : log.action,
-      ipAddress: log.ipAddress || 'غير معروف',
-      device: log.oldData ? (() => { try { return JSON.parse(log.oldData)?.device || 'غير معروف'; } catch { return 'غير معروف'; } })() : 'غير معروف',
+      userName: adminMap[log.adminId] || 'مدير النظام',
+      action: log.action === 'login' ? 'تسجيل الدخول' : log.action === 'logout' ? 'تسجيل الخروج' : log.action === 'password_change' ? 'تغيير كلمة المرور' : log.action,
+      ipAddress: log.ipAddress || '127.0.0.1',
+      device: log.oldData ? (() => { try { return JSON.parse(log.oldData)?.device || 'متصفح الويب'; } catch { return 'متصفح الويب'; } })() : 'متصفح الويب',
       location: 'اليمن',
       createdAt: log.createdAt,
       status: (log.newData ? (() => { try { return JSON.parse(log.newData)?.status || 'success'; } catch { return 'success'; } })() : 'success') as 'success' | 'failure' | 'warning',

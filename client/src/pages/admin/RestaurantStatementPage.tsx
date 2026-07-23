@@ -71,6 +71,8 @@ export default function RestaurantStatementPage() {
 
     // تصميم من إعدادات لوحة التحكم
     const companyName = iSet('invoice_company_name', 'السريع ون');
+    const companyLogo = iSet('invoice_company_logo') || iSet('header_logo_url') || iSet('sidebar_logo_url');
+    const showLogo = iSet('invoice_show_logo') !== 'false';
     const headerText = iSet('invoice_header_text', 'كشف حساب - Store Statement');
     const companyAddress = iSet('invoice_company_address', '');
     const companyPhone = iSet('invoice_company_phone', '');
@@ -96,6 +98,15 @@ export default function RestaurantStatementPage() {
     doc.text(headerText, 196, 20, { align: 'right' });
     if (companyAddress) doc.text(companyAddress, 14, 12);
     if (companyPhone) doc.text(companyPhone, 14, 20);
+
+    if (showLogo && companyLogo && companyLogo.startsWith('data:image')) {
+      try {
+        const fmt = companyLogo.includes('png') ? 'PNG' : 'JPEG';
+        doc.addImage(companyLogo, fmt, 14, 5, 20, 20);
+      } catch (e) {
+        console.error('PDF logo error:', e);
+      }
+    }
 
     doc.setTextColor(0, 0, 0);
 
@@ -289,6 +300,27 @@ export default function RestaurantStatementPage() {
 
       {/* معلومات المتجر */}
       <div ref={printRef}>
+        {/* هيدر ترويسة كشف الحساب الرسمية باللغتين مع الشعار المرفوع */}
+        <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-5 rounded-xl mb-4 shadow-sm flex items-center justify-between print:rounded-none">
+          <div className="space-y-1">
+            <h2 className="text-xl font-black">{iSet('invoice_company_name', 'السريع ون')}</h2>
+            <p className="text-xs opacity-90">{iSet('invoice_header_text', 'كشف حساب تفصيلي - Store Statement')}</p>
+            {iSet('invoice_company_phone') && <p className="text-[11px] opacity-80 dir-ltr text-right">📞 {iSet('invoice_company_phone')}</p>}
+            {iSet('invoice_company_address') && <p className="text-[11px] opacity-80">📍 {iSet('invoice_company_address')}</p>}
+          </div>
+
+          {(iSet('invoice_show_logo') !== 'false' && (iSet('invoice_company_logo') || iSet('header_logo_url') || iSet('sidebar_logo_url'))) && (
+            <div className="bg-white/10 p-2 rounded-xl backdrop-blur-sm border border-white/20 shrink-0">
+              <img
+                src={iSet('invoice_company_logo') || iSet('header_logo_url') || iSet('sidebar_logo_url')}
+                alt="شعار الشركة"
+                className="h-14 w-14 max-h-16 object-contain rounded-lg bg-white p-1"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+          )}
+        </div>
+
         <Card className="border-2 border-blue-100 print:border-gray-300">
           <CardHeader className="bg-blue-50 print:bg-gray-100 rounded-t-lg">
             <div className="flex justify-between items-start">

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Save, Settings, Eye, Image as ImageIcon, Smartphone, Truck, 
   MessageCircle, Phone, Share2, Lock, ShoppingCart, Star, Bell,
-  ChevronDown, ChevronRight, Hash, Globe, Bike
+  ChevronDown, ChevronRight, Hash, Globe, Bike, AlertTriangle, ShoppingBag, Clock
 } from 'lucide-react';
 import ImageUpload from '@/components/ImageUpload';
 import { Button } from '@/components/ui/button';
@@ -291,10 +291,23 @@ export default function AdminUiSettings() {
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "تم إعادة التسلسل", description: "تم تحديث أرقام الطلبات بنجاح" });
+      toast({ title: "تم إعادة التسلسل", description: "تم تحديث أرقام طلبات المتاجر بنجاح" });
     },
     onError: () => {
-      toast({ title: "خطأ", description: "فشل في إعادة تسلسل الأرقام", variant: "destructive" });
+      toast({ title: "خطأ", description: "فشل في إعادة تسلسل أرقام طلبات المتاجر", variant: "destructive" });
+    },
+  });
+
+  const resetWasalniNumbersMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/admin/wasalni/reset-numbers', {});
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "تم إعادة التسلسل", description: "تم تحديث أرقام طلبات وصل لي بنجاح" });
+    },
+    onError: () => {
+      toast({ title: "خطأ", description: "فشل في إعادة تسلسل أرقام طلبات وصل لي", variant: "destructive" });
     },
   });
 
@@ -396,7 +409,7 @@ export default function AdminUiSettings() {
 
       <div className="p-6 space-y-6">
         <Tabs defaultValue="customer" className="w-full">
-          <TabsList className="grid grid-cols-4 w-full mb-6 bg-orange-50 border border-orange-100">
+          <TabsList className="grid grid-cols-3 w-full mb-6 bg-orange-50 border border-orange-100">
             <TabsTrigger value="customer" className="gap-1 text-xs data-[state=active]:bg-orange-500 data-[state=active]:text-white">
               <Smartphone className="h-3.5 w-3.5" />
               تطبيق العميل
@@ -407,11 +420,7 @@ export default function AdminUiSettings() {
             </TabsTrigger>
             <TabsTrigger value="store" className="gap-1 text-xs data-[state=active]:bg-orange-500 data-[state=active]:text-white">
               <Settings className="h-3.5 w-3.5" />
-              إعدادات المتجر
-            </TabsTrigger>
-            <TabsTrigger value="flutter" className="gap-1 text-xs data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-              <Globe className="h-3.5 w-3.5" />
-              تطبيق Flutter
+              إعدادات المتجر وساعات العمل
             </TabsTrigger>
           </TabsList>
 
@@ -464,6 +473,18 @@ export default function AdminUiSettings() {
             <SectionCard {...secProps('privacy')} title="سياسة الخصوصية" icon={Lock} color="text-gray-600">
               <SettingRow label="إظهار زر سياسة الخصوصية" {...rowProps('show_privacy_button')} type="boolean" description="إظهار أو إخفاء زر السياسة في القائمة الجانبية" />
               <SettingRow label="نص سياسة الخصوصية" {...rowProps('privacy_policy_text')} type="textarea" placeholder="نص سياسة الخصوصية..." description="النص الكامل لسياسة الخصوصية الذي يظهر للمستخدمين" rows={6} />
+            </SectionCard>
+
+            {/* محتوى صفحة حول التطبيق */}
+            <SectionCard {...secProps('about_page')} title="محتوى صفحة حول التطبيق" icon={Globe} color="text-indigo-600">
+              <SettingRow label="اسم التطبيق" {...rowProps('about_app_name')} placeholder="السريع ون (Alsaree1)" description="اسم التطبيق الظاهر في رأس صفحة حول التطبيق" />
+              <SettingRow label="نبذة ووصف التطبيق" {...rowProps('about_app_description')} type="textarea" placeholder="التطبيق الرائد والأسرع لتوصيل الخضار والفواكه والمواد الغذائية والمتاجر..." description="الوصف التفصيلي عن التطبيق وخدماته" rows={3} />
+              <SettingRow label="رقم الإصدار" {...rowProps('about_app_version')} placeholder="1.5.0" description="رقم إصدار التطبيق (مثال: 1.5.0)" />
+              <SettingRow label="رؤية التطبيق" {...rowProps('about_app_vision')} type="textarea" placeholder="أن نكون الخيار الأول والأنسب لكل منزل ومؤسسة..." description="النص الخاص برؤية المنصة المستقلية" rows={2} />
+              <SettingRow label="رسالة التطبيق" {...rowProps('about_app_mission')} type="textarea" placeholder="تقديم تجربة تسوق سلسة وآمنة وتوفير طازج المنتجات..." description="النص الخاص برسالة التطبيق للعملاء" rows={2} />
+              <SettingRow label="رقم هاتف التواصل" {...rowProps('about_app_phone')} placeholder="+967770000000" description="رقم الهاتف الظاهر في قسم الاتصال" />
+              <SettingRow label="رقم واتساب التواصل" {...rowProps('about_app_whatsapp')} placeholder="+967770000000" description="رقم الواتساب المباشر للعملاء" />
+              <SettingRow label="البريد الإلكتروني للدعم" {...rowProps('about_app_email')} placeholder="support@alsaree1.com" description="بريد التواصل والدعم الفني" />
             </SectionCard>
 
             {/* إعدادات السلة والدفع */}
@@ -668,120 +689,188 @@ export default function AdminUiSettings() {
           </TabsContent>
 
           {/* ===== تبويب إعدادات المتجر ===== */}
-          <TabsContent value="store" className="space-y-4">
+          {/* ===== تبويب إعدادات المتجر وساعات العمل ===== */}
+          <TabsContent value="store" className="space-y-6">
 
-            {/* تسلسل أرقام الطلبات */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Hash className="h-5 w-5 text-orange-500" />
-                  إدارة تسلسل أرقام الطلبات
+            {/* حالة المتجر والإغلاق الطارئ */}
+            <Card className="border-red-200 shadow-sm overflow-hidden">
+              <CardHeader className="bg-red-50/50 border-b border-red-100">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-red-700 font-bold">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    حالة المتجر والإغلاق الطارئ
+                  </span>
+                  <span className="text-xs bg-red-100 text-red-800 px-2.5 py-1 rounded-full font-bold">
+                    إدارة فورية
+                  </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <p className="text-sm text-amber-800 font-medium mb-1">⚠️ تنبيه مهم</p>
-                  <p className="text-xs text-amber-700">إعادة تسلسل أرقام الطلبات تعيد ترقيم الطلبات الحالية من 1 إلى ما لا نهاية بترتيب تاريخي. هذا لا يحذف أي طلبات.</p>
+              <CardContent className="divide-y divide-gray-100 pt-3">
+                <SettingRow
+                  label="تفعيل الإغلاق الطارئ للمتجر"
+                  {...rowProps('store_emergency_closed')}
+                  type="boolean"
+                  description="عند تفعيله، سيتم إغلاق المتجر فوراً وإظهار رسالة تنبيهية منبثقة للعملاء تمنعهم من تنفيذ طلبات جديدة"
+                />
+                <SettingRow
+                  label="سبب الإغلاق الطارئ والرسالة المنبثقة للعملاء"
+                  {...rowProps('store_emergency_message')}
+                  type="textarea"
+                  placeholder="عذراً، المتجر مغلق حالياً بصفة طارئة لأعمال الصيانة والتحديث. سنعود للعمل قريباً!"
+                  description="هذه الرسالة تظهر في الواجهة المنبثقة للعميل فور دخول التطبيق أو محاولة إكمال الطلب"
+                  rows={2}
+                />
+                <SettingRow
+                  label="وضع تشغيل المتجر الرئيسي"
+                  {...rowProps('store_status')}
+                  placeholder="auto"
+                  description="اختر: auto (تلقائي حسب أوقات العمل) | open (مفتوح دائماً) | closed (مغلق يدوياً) | emergency (إغلاق طارئ)"
+                />
+              </CardContent>
+            </Card>
+
+            {/* أوقات وأيام العمل الرسمية */}
+            <Card className="shadow-sm">
+              <CardHeader className="bg-orange-50/40 border-b border-orange-100">
+                <CardTitle className="text-base flex items-center gap-2 text-gray-900 font-bold">
+                  <Clock className="h-5 w-5 text-orange-500" />
+                  أوقات وأيام العمل الرسمية للمتجر
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="divide-y divide-gray-100 pt-3">
+                <SettingRow label="وقت فتح المتجر يومياً" {...rowProps('opening_time')} placeholder="08:00" description="ساعة بدء استقبال الطلبات (تنسيق 24 ساعة، مثال: 08:00)" />
+                <SettingRow label="وقت إغلاق المتجر يومياً" {...rowProps('closing_time')} placeholder="23:00" description="ساعة التوقف عن استقبال الطلبات (مثال: 23:00)" />
+                <SettingRow label="أيام العمل الرسمية" {...rowProps('working_days')} placeholder="0,1,2,3,4,5,6" description="أرقام الأيام المفصولة بفواصل (0=الأحد، 1=الإثنين، ... 6=السبت)" />
+              </CardContent>
+            </Card>
+
+            {/* إعدادات الحد الأدنى للطلب */}
+            <Card className="shadow-sm">
+              <CardHeader className="bg-emerald-50/40 border-b border-emerald-100">
+                <CardTitle className="text-base flex items-center gap-2 text-emerald-900 font-bold">
+                  <ShoppingBag className="h-5 w-5 text-emerald-600" />
+                  إعدادات الحد الأدنى للطلب
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="divide-y divide-gray-100 pt-3">
+                <SettingRow
+                  label="تفعيل الحد الأدنى للطلب"
+                  {...rowProps('minimum_order_enabled')}
+                  type="boolean"
+                  description="عند التفعيل، لن يتمكن العميل من إرسال طلب يقل مجموع سلتـه عن القيمة المحددة"
+                />
+                <SettingRow
+                  label="قيمة الحد الأدنى للطلب (ريال)"
+                  {...rowProps('minimum_order_default')}
+                  placeholder="20"
+                  description="أقل قيمة لمجموع المشتريات بالريال لقبول الطلب"
+                />
+              </CardContent>
+            </Card>
+
+            {/* إدارة تسلسل أرقام الطلبات */}
+            <Card className="shadow-sm">
+              <CardHeader className="bg-blue-50/40 border-b border-blue-100">
+                <CardTitle className="text-base flex items-center gap-2 text-blue-900 font-bold">
+                  <Hash className="h-5 w-5 text-blue-600" />
+                  إدارة تسلسل أرقام الطلبات (المتاجر وخدمة وصل لي)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6 pt-4">
+                {/* طلبات المتاجر */}
+                <div className="border border-orange-200 rounded-lg p-4 bg-orange-50/20 space-y-3">
+                  <h4 className="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                    <ShoppingBag className="h-4 w-4 text-orange-500" />
+                    تسلسل طلبات المتاجر (Store Orders)
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <SettingRow label="بادئة الرقم" {...rowProps('order_number_prefix')} placeholder="ORD-" description="مثال: ORD-" />
+                    <SettingRow label="رقم البداية" {...rowProps('order_number_start')} placeholder="1001" description="الرقم الأول" />
+                    <SettingRow label="عدد الخانات" {...rowProps('order_number_digits')} placeholder="4" description="مثال: 4 (0001)" />
+                  </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <p className="text-xs text-gray-500">يقوم بإعادة ترقيم كافة طلبات المتاجر الحالية تسلسلياً</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                      onClick={() => {
+                        if (confirm('هل أنت متأكد من إعادة تسلسل أرقام طلبات المتاجر؟')) {
+                          resetOrderNumbersMutation.mutate();
+                        }
+                      }}
+                      disabled={resetOrderNumbersMutation.isPending}
+                    >
+                      {resetOrderNumbersMutation.isPending ? 'جاري التحديث...' : 'تطبيق إعادة التسلسل لطلبات المتاجر'}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="outline"
-                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
-                    onClick={() => {
-                      if (confirm('هل أنت متأكد من إعادة تسلسل أرقام الطلبات؟ ستبدأ الأرقام من 1.')) {
-                        resetOrderNumbersMutation.mutate();
-                      }
-                    }}
-                    disabled={resetOrderNumbersMutation.isPending}
-                  >
-                    {resetOrderNumbersMutation.isPending ? 'جاري التحديث...' : 'إعادة تسلسل الأرقام (من 1)'}
-                  </Button>
-                  <p className="text-xs text-gray-500">يُنصح بتنفيذها في وقت قلة الطلبات</p>
-                </div>
-                <div className="pt-2 divide-y divide-gray-100">
-                  <SettingRow label="رقم بداية التسلسل" {...rowProps('order_number_start')} placeholder="1" description="الرقم الذي ستبدأ منه الطلبات الجديدة" />
-                  <SettingRow label="بادئة رقم الطلب" {...rowProps('order_number_prefix')} placeholder="TT" description="النص الذي يسبق رقم الطلب (مثال: TT-0001)" />
+
+                {/* طلبات وصل لي */}
+                <div className="border border-purple-200 rounded-lg p-4 bg-purple-50/20 space-y-3">
+                  <h4 className="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                    <Truck className="h-4 w-4 text-purple-600" />
+                    تسلسل طلبات خدمة "وصل لي" (Wasalni Requests)
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <SettingRow label="بادئة الرقم" {...rowProps('wasalni_number_prefix')} placeholder="WSL-" description="مثال: WSL-" />
+                    <SettingRow label="رقم البداية" {...rowProps('wasalni_number_start')} placeholder="1001" description="الرقم الأول" />
+                    <SettingRow label="عدد الخانات" {...rowProps('wasalni_number_digits')} placeholder="4" description="مثال: 4 (0001)" />
+                  </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <p className="text-xs text-gray-500">يقوم بإعادة ترقيم كافة طلبات "وصل لي" الحالية تسلسلياً</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                      onClick={() => {
+                        if (confirm('هل أنت متأكد من إعادة تسلسل أرقام طلبات وصل لي؟')) {
+                          resetWasalniNumbersMutation.mutate();
+                        }
+                      }}
+                      disabled={resetWasalniNumbersMutation.isPending}
+                    >
+                      {resetWasalniNumbersMutation.isPending ? 'جاري التحديث...' : 'تطبيق إعادة التسلسل لطلبات وصل لي'}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* إعدادات المتجر الأساسية */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-orange-500" />
-                  إعدادات المتجر الأساسية
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="divide-y divide-gray-100">
-                <SettingRow label="الحد الأدنى للطلب (ريال)" {...rowProps('minimum_order_default')} placeholder="20" description="أقل قيمة للطلب يمكن قبولها" />
-                <SettingRow label="وقت الفتح" {...rowProps('opening_time')} placeholder="08:00" description="وقت فتح المتجر يومياً" />
-                <SettingRow label="وقت الإغلاق" {...rowProps('closing_time')} placeholder="23:00" description="وقت إغلاق المتجر يومياً" />
-              </CardContent>
-            </Card>
-
-            {/* إعدادات ساعات الموصلين والطلبات المؤجلة */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-orange-500" />
+            {/* ساعات دوام الموصلين والطلبات المؤجلة */}
+            <Card className="shadow-sm">
+              <CardHeader className="bg-purple-50/40 border-b border-purple-100">
+                <CardTitle className="text-base flex items-center gap-2 text-purple-900 font-bold">
+                  <Truck className="h-5 w-5 text-purple-600" />
                   ساعات دوام الموصلين والطلبات المؤجلة
                 </CardTitle>
               </CardHeader>
-              <CardContent className="divide-y divide-gray-100">
-                <div className="py-3 bg-orange-50 rounded-lg px-3 mb-2 text-sm text-orange-700">
-                  💡 عندما يحاول العميل الطلب خارج ساعات الموصلين، يظهر له خيار جدولة الطلب لوقت متاح.
+              <CardContent className="divide-y divide-gray-100 pt-3">
+                <div className="py-2.5 bg-purple-50 rounded-lg px-3 mb-2 text-xs text-purple-800">
+                  💡 عند طلب العميل خارج ساعات الموصلين، يطلب منه النظام تحديد وقت جدولة مؤجل ضمن أوقات الدوام المتاحة.
                 </div>
+                <SettingRow label="تفعيل ساعات دوام الموصلين" {...rowProps('enable_driver_hours')} type="boolean" description="تطبيق قيود ساعات دوام الموصلين عند إرسال الطلبات" />
                 <SettingRow label="بداية دوام الموصلين" {...rowProps('driver_start_time')} placeholder="09:00" description="الوقت الذي يبدأ فيه الموصلون العمل (مثال: 09:00)" />
                 <SettingRow label="نهاية دوام الموصلين" {...rowProps('driver_end_time')} placeholder="21:00" description="الوقت الذي ينتهي فيه دوام الموصلين (مثال: 21:00)" />
-                <SettingRow label="تفعيل الطلبات المؤجلة" {...rowProps('enable_scheduled_orders')} type="boolean" description="السماح للعملاء بجدولة طلباتهم خارج ساعات الموصلين" />
+                <SettingRow label="تفعيل الطلبات المؤجلة (الجدولة)" {...rowProps('enable_scheduled_orders')} type="boolean" description="السماح للعملاء بجدولة طلباتهم خارج ساعات الموصلين" />
               </CardContent>
             </Card>
 
-            {/* الإشعارات */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Bell className="h-5 w-5 text-orange-500" />
-                  إعدادات الإشعارات
+            {/* الإشعارات والتنبيهات */}
+            <Card className="shadow-sm">
+              <CardHeader className="bg-gray-50 border-b border-gray-100">
+                <CardTitle className="text-base flex items-center gap-2 text-gray-800 font-bold">
+                  <Bell className="h-5 w-5 text-gray-600" />
+                  إعدادات الإشعارات والتنبيهات
                 </CardTitle>
               </CardHeader>
-              <CardContent className="divide-y divide-gray-100">
+              <CardContent className="divide-y divide-gray-100 pt-3">
                 <SettingRow label="إشعارات الطلبات الجديدة للعملاء" {...rowProps('notify_customers_new_order')} type="boolean" description="إرسال إشعار للعميل عند قبول طلبه" />
                 <SettingRow label="إشعارات تحديث حالة الطلب" {...rowProps('notify_customers_status_update')} type="boolean" description="إشعار للعميل عند كل تحديث في حالة طلبه" />
                 <SettingRow label="إشعارات الطلبات للسائقين" {...rowProps('notify_drivers_new_order')} type="boolean" description="إشعار للسائقين المتاحين عند وصول طلب جديد" />
                 <SettingRow label="تنبيه المدير للطلبات المنسية" {...rowProps('notify_admin_pending_orders')} type="boolean" description="تنبيه في لوحة التحكم للطلبات التي لم تُعيَّن لسائق" />
               </CardContent>
             </Card>
-          </TabsContent>
-
-          {/* ===== تبويب تطبيق Flutter ===== */}
-          <TabsContent value="flutter" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Globe className="h-5 w-5 text-orange-500" />
-                  رابط تطبيق الويب (WebView URL)
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="divide-y divide-gray-100">
-                <div className="py-3">
-                  <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 mb-2">
-                    💡 هذا هو الرابط الذي يحمّله تطبيق Flutter داخل الـ WebView. قم بتحديثه إذا انتقلت الخدمة إلى نطاق جديد.
-                  </div>
-                </div>
-                <SettingRow label="رابط تطبيق الويب" {...rowProps('webAppUrl')} placeholder="https://your-domain.replit.app" description="الرابط الكامل للموقع الذي يعرضه تطبيق Flutter" />
-              </CardContent>
-            </Card>
-
-            <SectionCard {...secProps('flutter_splash')} title="شاشة البداية (Flutter Splash Screen)" icon={Star} color="text-yellow-600">
-              <SettingRow label="تفعيل شاشة البداية" {...rowProps('splashEnabled')} type="boolean" description="عرض شاشة البداية عند فتح تطبيق Flutter" />
-              <SettingRow label="عنوان شاشة البداية" {...rowProps('splashTitle')} placeholder="السريع ون" description="النص الرئيسي في شاشة البداية" />
-              <SettingRow label="وصف شاشة البداية" {...rowProps('splashSubtitle')} type="textarea" placeholder="متجر الخضار والفواكه الطازجة..." description="النص الفرعي أسفل العنوان" rows={2} />
-              <SettingRow label="لون خلفية شاشة البداية (hex)" {...rowProps('splashBackgroundColor')} placeholder="#FFFFFF" description="لون خلفية شاشة البداية (مثال: #FFFFFF للأبيض)" />
-              <SettingRow label="مدة ظهور شاشة البداية (ميلي ثانية)" {...rowProps('splashDuration')} placeholder="3000" description="المدة التي تبقى فيها شاشة البداية مرئية. 3000 = 3 ثوان" />
-              <SettingRow label="صورة شاشة البداية" {...rowProps('splashImageUrl')} type="image" description="الشعار أو الصورة في شاشة البداية" />
-            </SectionCard>
           </TabsContent>
         </Tabs>
       </div>

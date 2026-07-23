@@ -1,85 +1,75 @@
-import { useQuery } from '@tanstack/react-query';
-import { Clock } from 'lucide-react';
+import { useUiSettings } from '@/context/UiSettingsContext';
+import { getAppStatus } from '@/utils/restaurantHours';
+import { Clock, AlertTriangle } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 
-const calculateStoreStatus = (openingTime: string, closingTime: string): { isOpen: boolean; message: string } => {
-  const now = new Date();
-  const currentTime = now.toTimeString().slice(0, 5);
-  
-  const currentMinutes = timeToMinutes(currentTime);
-  const openMinutes = timeToMinutes(openingTime);
-  const closeMinutes = timeToMinutes(closingTime);
-  
-  let isOpen = false;
-  
-  if (closeMinutes > openMinutes) {
-    isOpen = currentMinutes >= openMinutes && currentMinutes < closeMinutes;
-  } else {
-    isOpen = currentMinutes >= openMinutes || currentMinutes < closeMinutes;
-  }
-  
-  if (isOpen) {
-    let minutesUntilClose;
-    if (closeMinutes > openMinutes) {
-      minutesUntilClose = closeMinutes - currentMinutes;
-    } else {
-      if (currentMinutes >= openMinutes) {
-        minutesUntilClose = (24 * 60) + closeMinutes - currentMinutes;
-      } else {
-        minutesUntilClose = closeMinutes - currentMinutes;
-      }
-    }
-    
-    if (minutesUntilClose <= 30) {
-      return { isOpen: true, message: `يغلق قريباً - ${closingTime}` };
-    }
-    return { isOpen: true, message: `مفتوح حتى ${closingTime}` };
-  }
-  
-  return { isOpen: false, message: `يفتح الساعة ${openingTime}` };
-};
-
-const timeToMinutes = (time: string): number => {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
-};
-
 export default function TimingBanner() {
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [, setCurrentTime] = useState(new Date());
+  const { getSetting } = useUiSettings();
 
-  const { data: uiSettings } = useQuery({
-    queryKey: ['/api/admin/ui-settings'],
-  });
+  const openingTime = getSetting('opening_time', '08:00');
+  const closingTime = getSetting('closing_time', '23:00');
+  const storeStatusSetting = getSetting('store_status', 'auto');
+  const storeEmergencyClosed = getSetting('store_emergency_closed', 'false');
+  const emergencyMessage = getSetting('store_emergency_message', '');
+  const workingDays = getSetting('working_days', '0,1,2,3,4,5,6');
 
-  const openingTime = (uiSettings as any[])?.find((setting: any) => setting.key === 'opening_time')?.value || '11:00';
-  const closingTime = (uiSettings as any[])?.find((setting: any) => setting.key === 'closing_time')?.value || '23:00';
-  
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000);
+    }, 15000); // Check every 15 seconds
     return () => clearInterval(timer);
   }, []);
-  
-  const storeStatus = useMemo(() => {
-    return calculateStoreStatus(openingTime, closingTime);
-  }, [openingTime, closingTime, currentTime]);
+
+  const appStatus = useMemo(() => {
+    return getAppStatus(
+      openingTime,
+      closingTime,
+      storeStatusSetting,
+      storeEmergencyClosed,
+      emergencyMessage,
+      workingDays
+    );
+  }, [openingTime, closingTime, storeStatusSetting, storeEmergencyClosed, emergencyMessage, workingDays]);
+
+  const isEmergency = storeEmergencyClosed === 'true' || storeStatusSetting === 'emergency';
 
   return (
-    <div className="bg-white border-b border-gray-100 shadow-sm">
-      <div className="max-w-md mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
+    <div className={`border-b border-gray-100 shadow-sm transition-colors ${
+      isEmergency ? 'bg-red-50 text-red-900 border-red-200' : 'bg-white'
+    }`}>
+      <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between gap-3">
         <div
-          className={`shrink-0 px-3 py-1 rounded-lg text-xs font-black ${
-            storeStatus.isOpen
-              ? 'bg-emerald-500 text-white'
-              : 'bg-gray-800 text-white'
+          className={`shrink-0 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 ${
+            appStatus.isOpen
+              ? 'bg-emerald-500 text-white shadow-sm'
+              : isEmergency
+              ? 'bg-red-600 text-white animate-pulse'
+              : 'bg-red-500 text-white'
           }`}
         >
-          {storeStatus.isOpen ? 'مفتوح' : 'مغلق'}
+          {isEmergency ? (
+            <>
+              <AlertTriangle className="h-3 w-3" />
+              <span>إغلاق طارئ</span>
+            </>
+          ) : appStatus.isOpen ? (
+            'مفتوح الان'
+          ) : (
+            'مغلق الان'
+          )}
         </div>
-        <div className="flex-1 flex items-center justify-center gap-2 text-sm text-gray-600 font-medium">
-          <Clock className="h-4 w-4 text-primary shrink-0" />
-          <span>أوقات الدوام من الساعة <strong>{openingTime}</strong> حتى <strong>{closingTime}</strong></span>
+        <div className="flex-1 flex items-center justify-center gap-1.5 text-xs sm:text-sm text-gray-700 font-medium text-center">
+          <Clock className="h-4 w-4 text-orange-500 shrink-0" />
+          {isEmergency ? (
+            <span className="text-red-700 font-semibold line-clamp-1">
+              {emergencyMessage || 'المتجر مغلق حالياً بصفة طارئة'}
+            </span>
+          ) : (
+            <span>
+              أوقات الدوام: من <strong>{openingTime}</strong> حتى <strong>{closingTime}</strong>
+            </span>
+          )}
         </div>
       </div>
     </div>

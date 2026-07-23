@@ -5,6 +5,7 @@ import {
   Phone, Mail, Globe, MapPin, CreditCard, Stamp, AlignLeft,
   RefreshCw, CheckCircle, Image
 } from 'lucide-react';
+import ImageUpload from '@/components/ImageUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -337,16 +338,12 @@ export default function AdminInvoiceDesign() {
                       />
                     </div>
                     <div>
-                      <Label className="text-sm font-semibold flex items-center gap-2">
-                        <Image className="h-3.5 w-3.5" />
-                        رابط الشعار (URL)
-                      </Label>
-                      <Input
+                      <ImageUpload
+                        label="شعار الشركة للمستندات (رفع من جهازك)"
                         value={design.invoice_company_logo}
-                        onChange={e => set('invoice_company_logo', e.target.value)}
-                        placeholder="https://example.com/logo.png"
-                        className="mt-1"
-                        dir="ltr"
+                        onChange={url => set('invoice_company_logo', url)}
+                        placeholder="اختر ملف صورة من جهازك..."
+                        bucket="invoice-logos"
                       />
                       <div className="flex items-center gap-3 mt-2">
                         <div className="flex items-center gap-2">
@@ -354,16 +351,8 @@ export default function AdminInvoiceDesign() {
                             checked={design.invoice_show_logo === 'true'}
                             onCheckedChange={v => set('invoice_show_logo', v ? 'true' : 'false')}
                           />
-                          <Label className="text-xs text-gray-600">إظهار الشعار في المستندات</Label>
+                          <Label className="text-xs text-gray-600">إظهار الشعار في المستندات والسندات وكشوفات الحساب</Label>
                         </div>
-                        {design.invoice_company_logo && (
-                          <img
-                            src={design.invoice_company_logo}
-                            alt="معاينة الشعار"
-                            className="h-10 w-10 object-contain rounded border border-gray-200"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        )}
                       </div>
                     </div>
                     <div>

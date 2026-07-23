@@ -176,7 +176,23 @@ export interface AppStatus {
   closingTime: string;
 }
 
-export function getAppStatus(openingTime: string, closingTime: string, storeStatus?: string): AppStatus {
+export function getAppStatus(
+  openingTime: string = '08:00',
+  closingTime: string = '23:00',
+  storeStatus?: string,
+  storeEmergencyClosed?: string,
+  emergencyMessage?: string,
+  workingDays?: string
+): AppStatus {
+  if (storeEmergencyClosed === 'true' || storeStatus === 'emergency') {
+    return {
+      isOpen: false,
+      message: emergencyMessage || 'عذراً، المتجر مغلق حالياً بصفة طارئة لأعمال الصيانة والتحديث. سنعود للعمل قريباً!',
+      openingTime,
+      closingTime,
+    };
+  }
+
   if (storeStatus === 'closed') {
     return {
       isOpen: false,
@@ -186,7 +202,6 @@ export function getAppStatus(openingTime: string, closingTime: string, storeStat
     };
   }
 
-  // إذا كان المتجر مفتوحاً يدوياً، نتجاوز فحص الوقت تماماً
   if (storeStatus === 'open') {
     return {
       isOpen: true,
@@ -197,6 +212,20 @@ export function getAppStatus(openingTime: string, closingTime: string, storeStat
   }
 
   const now = new Date();
+  const currentDay = now.getDay(); // 0 = Sunday, 6 = Saturday
+
+  if (workingDays) {
+    const daysArr = workingDays.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+    if (daysArr.length > 0 && !daysArr.includes(currentDay)) {
+      return {
+        isOpen: false,
+        message: 'التطبيق مغلق اليوم حسب جدول أوقات العمل الرسمية',
+        openingTime,
+        closingTime,
+      };
+    }
+  }
+
   const currentTime = now.toTimeString().slice(0, 5);
   const currentMinutes = timeToMinutes(currentTime);
   const openMinutes = timeToMinutes(openingTime);

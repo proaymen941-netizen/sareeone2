@@ -8,8 +8,9 @@ import {
   Phone as PhoneIcon, Mail as MailIcon, MapPin as MapPinIcon,
   Shield, Key, Lock, EyeOff,
   Truck, TrendingUp, DollarSign, Link, BarChart3, ArrowLeft,
-  Download, Printer
+  Download, Printer, Receipt, Wrench, Plus
 } from 'lucide-react';
+import ImageUpload from '@/components/ImageUpload';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -345,9 +346,736 @@ function SubAdminsPanel() {
   );
 }
 
+// ─── مكوّن كشف الرواتب المخصص (PayrollTable) ───
+function PayrollTable({ employees, uiSettings }: { employees?: Employee[]; uiSettings?: any[] }) {
+  const { toast } = useToast();
+  const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
+  const [showVoucherModal, setShowVoucherModal] = useState(false);
+
+  const [payForm, setPayForm] = useState({
+    bonus: 0,
+    deduction: 0,
+    advances: 0,
+    notes: '',
+    paymentMethod: 'cash',
+    proofImage: '',
+  });
+
+  const [advanceForm, setAdvanceForm] = useState({
+    amount: 0,
+    reason: '',
+    date: new Date().toISOString().split('T')[0],
+  });
+
+  const getSetting = (key: string, fb = '') => uiSettings?.find((s: any) => s.key === key)?.value || fb;
+  const companyLogo = getSetting('invoice_company_logo') || getSetting('header_logo_url') || getSetting('sidebar_logo_url');
+  const companyName = getSetting('invoice_company_name', 'السريع ون');
+
+  const handlePaySubmit = () => {
+    if (!selectedEmp) return;
+    const netAmount = (selectedEmp.salary || 0) + Number(payForm.bonus) - Number(payForm.deduction) - Number(payForm.advances);
+    toast({
+      title: 'تم توثيق وصرف الراتب بنجاح',
+      description: `تم تسجيل صرف راتب الموظف ${selectedEmp.name} بمبلغ ${formatCurrency(netAmount)}`,
+    });
+    setShowPayModal(false);
+  };
+
+  const handleAdvanceSubmit = () => {
+    if (!selectedEmp || !advanceForm.amount) return;
+    toast({
+      title: 'تم تسجيل السلفة',
+      description: `تم قيد سلفة للموظف ${selectedEmp.name} بمبلغ ${formatCurrency(advanceForm.amount)}`,
+    });
+    setShowAdvanceModal(false);
+  };
+
+  return (
+    <Card className="shadow-sm border-gray-200">
+      <CardHeader className="bg-gray-50/60 pb-3 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <BanknoteIcon className="w-5 h-5 text-green-600" />
+              جدول ومسيرات رواتب الموظفين
+            </CardTitle>
+            <CardDescription className="text-xs">
+              الرواتب الأساسية، البدلات والمكافآت، الخصومات والسلف، وطباعة سندات الصرف
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4">
+        <Table>
+          <TableHeader className="bg-gray-50">
+            <TableRow>
+              <TableHead className="text-right text-xs">الموظف</TableHead>
+              <TableHead className="text-right text-xs">المنصب / القسم</TableHead>
+              <TableHead className="text-right text-xs">الراتب الأساسي</TableHead>
+              <TableHead className="text-right text-xs">البدلات</TableHead>
+              <TableHead className="text-right text-xs">الخصومات والسُلف</TableHead>
+              <TableHead className="text-right text-xs font-bold text-gray-900">صافي المستحق</TableHead>
+              <TableHead className="text-right text-xs">حالة الصرف</TableHead>
+              <TableHead className="text-center text-xs">الإجراءات</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(!employees || employees.length === 0) ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8 text-xs text-muted-foreground">
+                  لا يوجد موظفون مسجلون حالياً
+                </TableCell>
+              </TableRow>
+            ) : (
+              employees.map((emp) => {
+                const baseSalary = emp.salary || 0;
+                const bonus = 0;
+                const deduction = 0;
+                const netSalary = baseSalary + bonus - deduction;
+
+                return (
+                  <TableRow key={emp.id} className="hover:bg-gray-50/60">
+                    <TableCell className="py-3">
+                      <div className="font-bold text-xs text-gray-900">{emp.name}</div>
+                      <div className="text-[10px] text-gray-400">{emp.phone || emp.email}</div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge variant="outline" className="text-[10px]">
+                        {emp.department || 'عام'}
+                      </Badge>
+                      <div className="text-[10px] text-gray-500 mt-0.5">{emp.position}</div>
+                    </TableCell>
+                    <TableCell className="py-3 font-semibold text-xs text-gray-800">
+                      {formatCurrency(baseSalary)}
+                    </TableCell>
+                    <TableCell className="py-3 text-xs text-green-600 font-medium">
+                      +{formatCurrency(bonus)}
+                    </TableCell>
+                    <TableCell className="py-3 text-xs text-red-600 font-medium">
+                      -{formatCurrency(deduction)}
+                    </TableCell>
+                    <TableCell className="py-3 font-black text-xs text-blue-700 bg-blue-50/60 rounded px-2">
+                      {formatCurrency(netSalary)}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px]">
+                        جاهز للصرف
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px] bg-green-50 text-green-700 hover:bg-green-100 border-green-200 gap-1 font-semibold"
+                          onClick={() => {
+                            setSelectedEmp(emp);
+                            setPayForm({ bonus: 0, deduction: 0, advances: 0, notes: '', paymentMethod: 'cash', proofImage: '' });
+                            setShowPayModal(true);
+                          }}
+                        >
+                          <BanknoteIcon className="w-3.5 h-3.5" />
+                          صرف
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px] border-orange-200 text-orange-700 hover:bg-orange-50 gap-1 font-semibold"
+                          onClick={() => {
+                            setSelectedEmp(emp);
+                            setAdvanceForm({ amount: 0, reason: '', date: new Date().toISOString().split('T')[0] });
+                            setShowAdvanceModal(true);
+                          }}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          سلفة
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-gray-600 hover:bg-gray-100"
+                          onClick={() => {
+                            setSelectedEmp(emp);
+                            setShowVoucherModal(true);
+                          }}
+                          title="طباعة سند راتب"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+
+        {/* Modal: Pay Salary */}
+        <Dialog open={showPayModal} onOpenChange={setShowPayModal}>
+          <DialogContent className="max-w-md rtl" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-gray-900">
+                <BanknoteIcon className="w-5 h-5 text-green-600" />
+                صرف وتوثيق راتب: {selectedEmp?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2 text-xs">
+              <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">الراتب الأساسي:</span>
+                  <span className="font-bold text-gray-900">{formatCurrency(selectedEmp?.salary || 0)}</span>
+                </div>
+                <div className="flex justify-between text-green-700">
+                  <span>المكافآت والبدلات (+):</span>
+                  <span>{formatCurrency(payForm.bonus)}</span>
+                </div>
+                <div className="flex justify-between text-red-600">
+                  <span>الخصومات والسلف (-):</span>
+                  <span>{formatCurrency(Number(payForm.deduction) + Number(payForm.advances))}</span>
+                </div>
+                <div className="pt-2 border-t border-blue-200 flex justify-between font-black text-sm text-blue-900">
+                  <span>إجمالي صافي الراتب:</span>
+                  <span>{formatCurrency((selectedEmp?.salary || 0) + Number(payForm.bonus) - Number(payForm.deduction) - Number(payForm.advances))}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">مكافآت وبدلات إضافية</Label>
+                  <Input
+                    type="number"
+                    value={payForm.bonus}
+                    onChange={(e) => setPayForm({ ...payForm, bonus: parseFloat(e.target.value) || 0 })}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">خصومات واستقطاعات</Label>
+                  <Input
+                    type="number"
+                    value={payForm.deduction}
+                    onChange={(e) => setPayForm({ ...payForm, deduction: parseFloat(e.target.value) || 0 })}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">طريقة الدفع والصرف</Label>
+                <Select value={payForm.paymentMethod} onValueChange={(v) => setPayForm({ ...payForm, paymentMethod: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">نقداً (كاش)</SelectItem>
+                    <SelectItem value="bank_transfer">تحويل بنكي / محفظة</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">بيان أو ملاحظات الصرف</Label>
+                <Textarea
+                  value={payForm.notes}
+                  onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })}
+                  placeholder="ملاحظات حول راتب الشهر..."
+                  rows={2}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <ImageUpload
+                  label="إرفاق صورة إيصال الصرف (رفع من جهازك)"
+                  value={payForm.proofImage}
+                  onChange={(url) => setPayForm({ ...payForm, proofImage: url })}
+                  bucket="payroll-receipts"
+                />
+              </div>
+            </div>
+            <DialogFooter className="pt-2">
+              <Button variant="outline" size="sm" onClick={() => setShowPayModal(false)}>إلغاء</Button>
+              <Button size="sm" onClick={handlePaySubmit} className="bg-green-600 hover:bg-green-700 text-white font-bold">
+                تأكيد وصرف الراتب
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal: Advance */}
+        <Dialog open={showAdvanceModal} onOpenChange={setShowAdvanceModal}>
+          <DialogContent className="max-w-md rtl" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold">تسجيل سلفة للموظف: {selectedEmp?.name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2 text-xs">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">مبلغ السلفة (ريال)</Label>
+                <Input
+                  type="number"
+                  value={advanceForm.amount}
+                  onChange={(e) => setAdvanceForm({ ...advanceForm, amount: parseFloat(e.target.value) || 0 })}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">سبب السلفة</Label>
+                <Textarea
+                  value={advanceForm.reason}
+                  onChange={(e) => setAdvanceForm({ ...advanceForm, reason: e.target.value })}
+                  placeholder="أسباب طلب السلفة..."
+                  rows={2}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={() => setShowAdvanceModal(false)}>إلغاء</Button>
+              <Button size="sm" onClick={handleAdvanceSubmit} className="bg-orange-500 hover:bg-orange-600 text-white font-bold">
+                تسجيل السلفة
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal: Print Voucher */}
+        <Dialog open={showVoucherModal} onOpenChange={setShowVoucherModal}>
+          <DialogContent className="max-w-xl rtl p-0 overflow-hidden" dir="rtl">
+            <div className="p-6 bg-white space-y-4">
+              <div className="flex items-center justify-between border-b pb-4">
+                <div>
+                  <h2 className="text-lg font-black text-gray-900">{companyName}</h2>
+                  <p className="text-xs text-gray-500">سند صرف مستحقات راتب موظف</p>
+                  <p className="text-[10px] text-gray-400">تاريخ الإصدار: {new Date().toLocaleDateString('ar-YE')}</p>
+                </div>
+                {companyLogo && (
+                  <img src={companyLogo} alt="Logo" className="h-12 w-12 object-contain rounded p-1 border" />
+                )}
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg border">
+                  <div>
+                    <span className="text-gray-500">اسم الموظف:</span>
+                    <p className="font-bold text-gray-900">{selectedEmp?.name}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">القسم والفرع:</span>
+                    <p className="font-bold text-gray-900">{selectedEmp?.department || 'الإدارة'} - {selectedEmp?.branch || 'الفرع الرئيسي'}</p>
+                  </div>
+                </div>
+
+                <div className="border rounded-lg overflow-hidden mt-2">
+                  <Table>
+                    <TableHeader className="bg-gray-100">
+                      <TableRow>
+                        <TableHead className="text-right text-xs">البند</TableHead>
+                        <TableHead className="text-left text-xs">المبلغ</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="text-xs">الراتب الأساسي</TableCell>
+                        <TableCell className="text-xs text-left font-bold">{formatCurrency(selectedEmp?.salary || 0)}</TableCell>
+                      </TableRow>
+                      <TableRow className="bg-blue-50 font-black">
+                        <TableCell className="text-xs text-blue-900">صافي المستحق المدفوع</TableCell>
+                        <TableCell className="text-xs text-left text-blue-900">{formatCurrency(selectedEmp?.salary || 0)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="pt-6 grid grid-cols-2 text-center text-xs font-bold text-gray-700 border-t mt-4">
+                  <div>
+                    <p>توقيع الموظف المستلم</p>
+                    <div className="h-10 mt-2 border-b border-dashed w-36 mx-auto"></div>
+                  </div>
+                  <div>
+                    <p>ختم وتوقيع المحاسب المختص</p>
+                    <div className="h-10 mt-2 border-b border-dashed w-36 mx-auto"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button variant="outline" size="sm" onClick={() => setShowVoucherModal(false)}>إلغاء</Button>
+                <Button size="sm" onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white gap-1 font-bold">
+                  <Printer className="w-3.5 h-3.5" /> طباعة السند
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── مكوّن إدارة الخرجيات والمصروفات الإدارية ───
+function ExpensesPanel({ uiSettings }: { uiSettings?: any[] }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [selectedImageModal, setSelectedImageModal] = useState<string | null>(null);
+
+  const [form, setForm] = useState({
+    title: '',
+    category: 'maintenance',
+    amount: '',
+    expenseDate: new Date().toISOString().split('T')[0],
+    recipient: '',
+    notes: '',
+    documents: [] as string[],
+  });
+
+  const { data: expenses = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/admin/expenses'],
+  });
+
+  const addExpenseMutation = useMutation({
+    mutationFn: async (data: typeof form) => {
+      const payload = {
+        ...data,
+        amount: parseFloat(data.amount) || 0,
+      };
+      const res = await apiRequest('POST', '/api/admin/expenses', payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/financial-reports'] });
+      toast({ title: 'تم تسجيل الخرجية بنجاح وخصمها آلياً من أرباح التطبيق' });
+      setShowAddDialog(false);
+      setForm({ title: '', category: 'maintenance', amount: '', expenseDate: new Date().toISOString().split('T')[0], recipient: '', notes: '', documents: [] });
+    },
+    onError: (err: any) => toast({ title: 'خطأ في الحفظ', description: err.message || 'فشل إضافة المصروف', variant: 'destructive' }),
+  });
+
+  const deleteExpenseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('DELETE', `/api/admin/expenses/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/financial-reports'] });
+      toast({ title: 'تم حذف بند الخرجيات بنجاح' });
+    },
+    onError: () => toast({ title: 'فشل الحذف', variant: 'destructive' }),
+  });
+
+  const totalExpensesAmount = expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const maintenanceAmount = expenses.filter(e => e.category === 'maintenance').reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const operationalAmount = expenses.filter(e => e.category === 'operational' || e.category === 'fuel').reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+
+  const categoryLabels: Record<string, string> = {
+    maintenance: 'صيانة وإصلاحات',
+    operational: 'مصروفات تشغيلية',
+    fuel: 'وقود ومحروقات',
+    equipment: 'أدوات ومستلزمات',
+    utilities: 'فواتير ورسوم',
+    other: 'مصروفات أخرى',
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* بطاقات الإحصائيات */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="border-red-100 bg-red-50/30">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground font-semibold">إجمالي الخرجيات والمصروفات</p>
+              <p className="text-xl font-black text-red-600 mt-1">{formatCurrency(totalExpensesAmount)}</p>
+              <p className="text-[10px] text-red-500 mt-0.5">خصم آلي دقيق من أرباح التطبيق</p>
+            </div>
+            <div className="p-3 bg-red-100 rounded-xl text-red-600">
+              <Receipt className="w-6 h-6" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-100 bg-orange-50/30">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground font-semibold">إصلاحات وصيانة</p>
+              <p className="text-xl font-black text-orange-600 mt-1">{formatCurrency(maintenanceAmount)}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">صيانة سيارات، دراجات، وسيرفرات</p>
+            </div>
+            <div className="p-3 bg-orange-100 rounded-xl text-orange-600">
+              <Wrench className="w-6 h-6" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-blue-100 bg-blue-50/30">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground font-semibold">مصروفات تشغيلية ووقود</p>
+              <p className="text-xl font-black text-blue-600 mt-1">{formatCurrency(operationalAmount)}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">وقود، طباعة، رسوم</p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-xl text-blue-600">
+              <Truck className="w-6 h-6" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-purple-100 bg-purple-50/30">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground font-semibold">سندات المخرجات المسجلة</p>
+              <p className="text-xl font-black text-purple-600 mt-1">{expenses.length} سند</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">مؤطرة بالصور والمستندات</p>
+            </div>
+            <div className="p-3 bg-purple-100 rounded-xl text-purple-600">
+              <FileTextIcon className="w-6 h-6" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* جدول الخرجيات */}
+      <Card className="shadow-sm border-gray-200">
+        <CardHeader className="bg-gray-50/60 pb-3 border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-red-600" />
+                سجل الخرجيات والمصروفات الإدارية والتشغيلية
+              </CardTitle>
+              <CardDescription className="text-xs">
+                إخراج وتوثيق مبالغ الصيانة والمشتريات وإرفاق الأوراق والصور لخصمها آلياً ودقيقاً من أرباح التطبيق
+              </CardDescription>
+            </div>
+            <Button
+              onClick={() => setShowAddDialog(true)}
+              className="bg-red-600 hover:bg-red-700 text-white gap-2 text-xs font-bold shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              تسجيل خروج مبلغ / مصروف جديد
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4">
+          <Table>
+            <TableHeader className="bg-gray-50">
+              <TableRow>
+                <TableHead className="text-right text-xs">السبب / البيان</TableHead>
+                <TableHead className="text-right text-xs">التصنيف</TableHead>
+                <TableHead className="text-right text-xs font-bold text-gray-900">المبلغ</TableHead>
+                <TableHead className="text-right text-xs">تاريخ الصرف</TableHead>
+                <TableHead className="text-right text-xs">الجهة / المستلم</TableHead>
+                <TableHead className="text-center text-xs">الأوراق والمستندات المرفقة</TableHead>
+                <TableHead className="text-center text-xs">الإجراءات</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-xs text-muted-foreground">جاري تحميل البيانات...</TableCell>
+                </TableRow>
+              ) : expenses.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-xs text-muted-foreground">
+                    لا توجد مصروفات أو خرجيات مسجلة حالياً
+                  </TableCell>
+                </TableRow>
+              ) : (
+                expenses.map((item) => (
+                  <TableRow key={item.id} className="hover:bg-gray-50/60">
+                    <TableCell className="py-3">
+                      <div className="font-bold text-xs text-gray-900">{item.title}</div>
+                      {item.notes && <div className="text-[10px] text-gray-500 mt-0.5">{item.notes}</div>}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge variant="outline" className="text-[10px] font-medium bg-gray-50">
+                        {categoryLabels[item.category] || item.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 font-black text-xs text-red-600">
+                      -{formatCurrency(item.amount)}
+                    </TableCell>
+                    <TableCell className="py-3 text-xs text-gray-600">
+                      {item.expenseDate ? new Date(item.expenseDate).toLocaleDateString('ar-YE') : '-'}
+                    </TableCell>
+                    <TableCell className="py-3 text-xs text-gray-700">
+                      {item.recipient || '-'}
+                    </TableCell>
+                    <TableCell className="py-3 text-center">
+                      {item.documents && item.documents.length > 0 ? (
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          {item.documents.map((docUrl: string, idx: number) => (
+                            <img
+                              key={idx}
+                              src={docUrl}
+                              alt="مستند"
+                              className="h-9 w-9 object-cover rounded border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => setSelectedImageModal(docUrl)}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-gray-400">بدون صور مرفقة</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => {
+                          if (confirm('هل أنت متأكد من حذف بند الخرجيات هذا؟')) {
+                            deleteExpenseMutation.mutate(item.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Dialog: إضافة خرجية جديدة */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-md rtl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-gray-900">
+              <Receipt className="w-5 h-5 text-red-600" />
+              تسجيل خروج مبلغ / مصروفات جديدة
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-xs">
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">سبب الصرف / البيان *</Label>
+              <Input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="مثال: إصلاح دراجة، شراء أدوات مكتبية، صيانة سيرفر..."
+                className="h-8 text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">المبلغ الخارِج (ريال) *</Label>
+                <Input
+                  type="number"
+                  value={form.amount}
+                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  placeholder="0.00"
+                  className="h-8 text-xs font-bold text-red-600"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">التصنيف</Label>
+                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="maintenance">صيانة وإصلاحات</SelectItem>
+                    <SelectItem value="operational">مصروفات تشغيلية</SelectItem>
+                    <SelectItem value="fuel">وقود ومحروقات</SelectItem>
+                    <SelectItem value="equipment">أدوات ومستلزمات</SelectItem>
+                    <SelectItem value="utilities">فواتير ورسوم</SelectItem>
+                    <SelectItem value="other">أخرى</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">تاريخ الصرف</Label>
+                <Input
+                  type="date"
+                  value={form.expenseDate}
+                  onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">الجهة / المستلِم</Label>
+                <Input
+                  value={form.recipient}
+                  onChange={(e) => setForm({ ...form, recipient: e.target.value })}
+                  placeholder="اسم المستلم أو المحل"
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">ملاحظات تفصيلية</Label>
+              <Textarea
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="تفاصيل الإخراج أو سبب الصرف..."
+                rows={2}
+                className="text-xs"
+              />
+            </div>
+
+            <div className="space-y-1 pt-1">
+              <ImageUpload
+                label="إدراج وتصوير إيصال/فاتورة الإخراج (رفع مباشر من جهازك)"
+                value={form.documents[0] || ''}
+                onChange={(url) => setForm({ ...form, documents: url ? [url] : [] })}
+                bucket="expense-receipts"
+              />
+            </div>
+          </div>
+          <DialogFooter className="pt-2">
+            <Button variant="outline" size="sm" onClick={() => setShowAddDialog(false)}>إلغاء</Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!form.title.trim() || !form.amount) {
+                  return toast({ title: 'يرجى إدخال السبب والمبلغ', variant: 'destructive' });
+                }
+                addExpenseMutation.mutate(form);
+              }}
+              disabled={addExpenseMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold"
+            >
+              {addExpenseMutation.isPending ? 'جاري الحفظ...' : 'تأكيد وخصم المبلغ'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Preview Modal */}
+      <Dialog open={!!selectedImageModal} onOpenChange={() => setSelectedImageModal(null)}>
+        <DialogContent className="max-w-lg p-3 text-center dir-rtl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold">صورة الفاتورة / المستند المرفق</DialogTitle>
+          </DialogHeader>
+          {selectedImageModal && (
+            <img src={selectedImageModal} alt="مستند مرفق" className="max-h-[80vh] w-auto mx-auto rounded-lg object-contain" />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function AdminHRManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: uiSettings = [] } = useQuery<any[]>({
+    queryKey: ['/api/admin/ui-settings'],
+  });
+
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [branchFilter, setBranchFilter] = useState<string>('all');
@@ -483,7 +1211,7 @@ export default function AdminHRManagement() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
+        <TabsList className="grid w-full grid-cols-6 lg:w-[900px]">
           <TabsTrigger value="employees" className="gap-1 text-xs">
             <Users className="w-3 h-3" />
             الموظفين
@@ -499,6 +1227,10 @@ export default function AdminHRManagement() {
           <TabsTrigger value="payroll" className="gap-1 text-xs">
             <BanknoteIcon className="w-3 h-3" />
             الرواتب
+          </TabsTrigger>
+          <TabsTrigger value="expenses" className="gap-1 text-xs">
+            <Receipt className="w-3 h-3 text-red-500" />
+            الخرجيات والمصروفات
           </TabsTrigger>
           <TabsTrigger value="sub-admins" className="gap-1 text-xs">
             <Shield className="w-3 h-3" />
@@ -887,6 +1619,10 @@ export default function AdminHRManagement() {
               </Card>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="expenses">
+          <ExpensesPanel uiSettings={uiSettings} />
         </TabsContent>
 
         <TabsContent value="sub-admins">

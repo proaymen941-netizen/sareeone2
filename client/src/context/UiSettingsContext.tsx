@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 
 const SETTINGS_CACHE_KEY = 'ui_settings_cache';
-const SETTINGS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const SETTINGS_CACHE_TTL = 30 * 1000; // 30 seconds cache for fast sync
 
 interface UiSetting {
   id: string;
@@ -161,8 +161,8 @@ export function UiSettingsProvider({ children }: { children: React.ReactNode }) 
     // Connect WebSocket for real-time updates
     connectWebSocket();
 
-    // Periodic refresh every 30 seconds as fallback
-    const interval = setInterval(() => loadSettings(false), 30000);
+    // Periodic refresh every 10 seconds as fallback for real-time accuracy
+    const interval = setInterval(() => loadSettings(false), 10000);
 
     return () => {
       clearInterval(interval);

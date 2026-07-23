@@ -624,6 +624,19 @@ export async function ensureTablesExist() {
         created_at TIMESTAMP DEFAULT NOW() NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS app_expenses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title VARCHAR(255) NOT NULL,
+        category VARCHAR(100) DEFAULT 'operational' NOT NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        expense_date TIMESTAMP DEFAULT NOW() NOT NULL,
+        notes TEXT,
+        recipient VARCHAR(255),
+        documents TEXT,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS geo_zones (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name VARCHAR(100) NOT NULL,

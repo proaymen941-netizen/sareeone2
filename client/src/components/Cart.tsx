@@ -358,6 +358,18 @@ export function Cart({ isOpen, onClose }: CartProps) {
       return;
     }
 
+    const minimumOrderEnabled = getSetting('minimum_order_enabled', 'false') === 'true';
+    const minimumOrderDefault = parseFloat(getSetting('minimum_order_default', '0') || '0');
+
+    if (minimumOrderEnabled && minimumOrderDefault > 0 && state.subtotal < minimumOrderDefault) {
+      toast({
+        title: "لم يتم استيفاء الحد الأدنى للطلب",
+        description: `الحد الأدنى للطلب هو ${minimumOrderDefault} ريال. أضف منتجات بقيمة ${(minimumOrderDefault - state.subtotal).toFixed(2)} ريال للمتابعة.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // فحص توفر السائقين

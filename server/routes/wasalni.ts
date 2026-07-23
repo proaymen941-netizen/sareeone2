@@ -93,7 +93,22 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "البيانات الأساسية مطلوبة: الاسم، الهاتف، من عنوان، إلى عنوان" });
     }
 
-    const requestNumber = `WSL-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    let requestNumber;
+    try {
+      const allSettings = await storage.getUiSettings();
+      const settingsMap = new Map(allSettings.map((s: any) => [s.key, s.value]));
+      const prefix = settingsMap.get('wasalni_number_prefix') || 'WSL-';
+      const startNum = parseInt(settingsMap.get('wasalni_number_start') || '1001', 10);
+      const digits = parseInt(settingsMap.get('wasalni_number_digits') || '4', 10);
+
+      const dbInstance = (storage as any).db;
+      const existing = await dbInstance.select().from(wasalniRequests);
+      const count = existing ? existing.length : 0;
+      const nextSeq = startNum + count;
+      requestNumber = `${prefix}${String(nextSeq).padStart(digits, '0')}`;
+    } catch (_) {
+      requestNumber = `WSL-${Date.now()}`;
+    }
 
     const db = (storage as any).db;
     const [newRequest] = await db.insert(wasalniRequests).values({
