@@ -85,9 +85,43 @@ export default function Cart() {
     enabled: !!restaurantId,
   });
 
-  const { data: settings } = useQuery<any[]>({
+  const { data: settings, refetch: refetchSettings } = useQuery<any[]>({
     queryKey: ['/api/ui-settings'],
+    refetchInterval: 60000,
   });
+
+  // جلب طرق الدفع المُفعَّلة من لوحة التحكم
+  const { data: activePaymentMethods = [], refetch: refetchPaymentMethods } = useQuery<any[]>({
+    queryKey: ['/api/admin/payment-methods'],
+    select: (data) => (data || []).filter((m: any) => m.isActive !== false),
+  });
+
+  // الاستماع لتحديثات الإعدادات عبر WebSocket وتحديث السلة فوراً
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: any;
+    const connect = () => {
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'settings_changed' || data.type === 'settings_update') {
+            refetchSettings();
+            refetchPaymentMethods();
+          }
+        } catch {}
+      };
+      ws.onclose = () => { reconnectTimeout = setTimeout(connect, 5000); };
+      ws.onerror = () => ws?.close();
+    };
+    connect();
+    return () => {
+      clearTimeout(reconnectTimeout);
+      ws?.close();
+    };
+  }, [refetchSettings, refetchPaymentMethods]);
 
   const appStatus = useMemo(() => {
     const openingTime = (settings as any[])?.find((s: any) => s.key === 'opening_time')?.value || '08:00';
@@ -628,31 +662,46 @@ export default function Cart() {
                   onValueChange={(value) => setOrderForm(prev => ({ ...prev, paymentMethod: value }))}
                   className="space-y-3"
                 >
-                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                    <RadioGroupItem value="cash" id="cash" />
-                    <Label htmlFor="cash" className="flex-1 cursor-pointer">
-                      الدفع عند الاستلام
-                    </Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                    <RadioGroupItem value="wallet" id="wallet" />
-                    <Label htmlFor="wallet" className="flex-1 cursor-pointer">
-                      الدفع من رصيد
-                    </Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                    <RadioGroupItem value="digital" id="digital" />
-                    <Label htmlFor="digital" className="flex-1 cursor-pointer">
-                      الدفع باستخدام المحفظة الإلكترونية
-                    </Label>
-                  </div>
+                  {/* عرض طرق الدفع المُفعَّلة من لوحة التحكم ديناميكياً */}
+                  {activePaymentMethods.length > 0 ? (
+                    activePaymentMethods.map((method: any) => (
+                      <div key={method.id} className="flex items-center space-x-2 rtl:space-x-reverse border rounded-xl p-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                        <RadioGroupItem value={method.provider || method.id} id={`pm-${method.id}`} />
+                        <Label htmlFor={`pm-${method.id}`} className="flex-1 cursor-pointer flex items-center gap-2">
+                          <span className="text-lg">
+                            {method.type === 'cash' ? '💵' : method.type === 'wallet' ? '👜' : method.type === 'card' ? '💳' : '🏦'}
+                          </span>
+                          <span className="font-medium">{method.nameAr || method.name}</span>
+                        </Label>
+                      </div>
+                    ))
+                  ) : (
+                    /* طرق دفع افتراضية إذا لم تُحدَّد من لوحة التحكم */
+                    <>
+                      <div className="flex items-center space-x-2 rtl:space-x-reverse border rounded-xl p-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                        <RadioGroupItem value="cash" id="cash" />
+                        <Label htmlFor="cash" className="flex-1 cursor-pointer flex items-center gap-2">
+                          <span className="text-lg">💵</span>
+                          <span className="font-medium">نقداً عند الاستلام</span>
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2 rtl:space-x-reverse border rounded-xl p-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                        <RadioGroupItem value="wallet" id="wallet" />
+                        <Label htmlFor="wallet" className="flex-1 cursor-pointer flex items-center gap-2">
+                          <span className="text-lg">👜</span>
+                          <span className="font-medium">المحفظة الإلكترونية</span>
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2 rtl:space-x-reverse border rounded-xl p-3 cursor-pointer hover:bg-gray-50 transition-colors">
+                        <RadioGroupItem value="digital" id="digital" />
+                        <Label htmlFor="digital" className="flex-1 cursor-pointer flex items-center gap-2">
+                          <span className="text-lg">🌐</span>
+                          <span className="font-medium">دفع إلكتروني</span>
+                        </Label>
+                      </div>
+                    </>
+                  )}
                 </RadioGroup>
-
-                <Button className="w-full mt-4 bg-orange-500 hover:bg-orange-600 text-white font-medium py-3">
-                  إضافة رصيد
-                </Button>
               </CardContent>
             </Card>
 

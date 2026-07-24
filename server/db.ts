@@ -49,12 +49,15 @@ import {
 import { IStorage } from "./storage";
 import { eq, and, desc, sql, or, like, asc, inArray, isNull } from "drizzle-orm";
 
-// Helper function to configure SSL for Render, Neon, Supabase, or cloud PostgreSQL instances
+// Helper function to configure SSL for cloud PostgreSQL instances
 function getSslOption(url: string) {
   if (!url) return undefined;
+  // إذا كان الرابط يحتوي على sslmode=disable، لا تستخدم SSL
+  if (url.includes("sslmode=disable") || url.includes("ssl=false")) {
+    return false;
+  }
   const isCloudProvider = url.includes("render.com") || url.includes("dpg-") || url.includes("neon.tech") || url.includes("supabase") || url.includes("aws");
-  const hasSslMode = url.includes("sslmode=") || url.includes("ssl=");
-  if (isCloudProvider || hasSslMode || process.env.NODE_ENV === "production" || process.env.DB_SSL === "true") {
+  if (isCloudProvider || process.env.DB_SSL === "true") {
     return { rejectUnauthorized: false };
   }
   return undefined;

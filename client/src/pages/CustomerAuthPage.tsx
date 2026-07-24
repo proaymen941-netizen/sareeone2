@@ -48,6 +48,22 @@ export default function CustomerAuthPage() {
     }
   };
 
+  // التحقق من رقم الهاتف اليمني: 9 أرقام يبدأ بـ 77، 78، 71، 70، أو 73
+  const validateYemeniPhone = (phone: string): string | null => {
+    // تحويل الأرقام العربية/الهندية إلى لاتينية وإزالة المسافات
+    const normalized = phone
+      .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))
+      .replace(/[\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) - 0x06F0))
+      .replace(/\s+/g, '');
+    if (!/^\d{9}$/.test(normalized)) {
+      return 'رقم الهاتف يجب أن يتكون من 9 أرقام بالضبط';
+    }
+    if (!/^(77|78|71|70|73)/.test(normalized)) {
+      return 'رقم الهاتف يجب أن يبدأ بـ 77 أو 78 أو 71 أو 70 أو 73';
+    }
+    return null;
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regName.trim()) {
@@ -56,6 +72,11 @@ export default function CustomerAuthPage() {
     }
     if (!regPhone.trim()) {
       setError('يرجى إدخال رقم الهاتف');
+      return;
+    }
+    const phoneError = validateYemeniPhone(regPhone);
+    if (phoneError) {
+      setError(phoneError);
       return;
     }
     setLoading(true);

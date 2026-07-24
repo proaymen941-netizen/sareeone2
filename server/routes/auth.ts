@@ -261,6 +261,14 @@ router.post('/validate', async (req, res) => {
   }
 });
 
+// التحقق من صحة رقم الهاتف اليمني
+function validateYemeniPhone(phone: string): string | null {
+  if (!phone) return 'رقم الهاتف مطلوب';
+  if (!/^\d{9}$/.test(phone)) return 'رقم الهاتف يجب أن يتكون من 9 أرقام بالضبط';
+  if (!/^(77|78|71|70|73)/.test(phone)) return 'رقم الهاتف يجب أن يبدأ بـ 77 أو 78 أو 71 أو 70 أو 73';
+  return null;
+}
+
 // تسجيل عميل جديد
 router.post('/register', async (req, res) => {
   try {
@@ -284,6 +292,14 @@ router.post('/register', async (req, res) => {
     }
     if (validatedData.email) {
       validatedData.email = String(validatedData.email).trim().toLowerCase();
+    }
+
+    // التحقق من صحة رقم الهاتف اليمني
+    if (validatedData.phone) {
+      const phoneError = validateYemeniPhone(validatedData.phone);
+      if (phoneError) {
+        return res.status(400).json({ success: false, message: phoneError });
+      }
     }
 
     // التحقق من وجود رقم الهاتف مسبقاً
