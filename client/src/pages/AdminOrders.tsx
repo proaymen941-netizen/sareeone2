@@ -204,6 +204,11 @@ export default function AdminOrders() {
     setEditPricesOrder(order);
   };
 
+  const { data: uiSettings } = useQuery<any[]>({ queryKey: ['/api/ui-settings'] });
+  const appLogoUrl = uiSettings?.find((s: any) => s.key === 'invoice_company_logo')?.value || 
+                     uiSettings?.find((s: any) => s.key === 'header_logo_url')?.value || 
+                     uiSettings?.find((s: any) => s.key === 'sidebar_logo_url')?.value || '';
+
   // ─── توليد سند PDF ───────────────────────────────────────────────────
   const handleGeneratePDF = async (order: Order) => {
     setPdfLoadingIds((prev) => new Set(prev).add(order.id));
@@ -213,6 +218,7 @@ export default function AdminOrders() {
         orderNumber: order.orderNumber || order.id.slice(0, 8),
         date: order.createdAt,
         storeName: (order as any).restaurantName || undefined,
+        logoUrl: appLogoUrl,
         items: parsedItems.map((item: any) => ({
           name: item.name || '',
           quantity: Number(item.quantity) || 1,

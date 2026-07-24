@@ -20,6 +20,7 @@ export interface OrderPDFData {
   deliveryFee?: number;
   total: number;
   driverName?: string;
+  logoUrl?: string;
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -71,8 +72,11 @@ function buildHTML(data: OrderPDFData): string {
     ? new Date(data.date).toLocaleDateString('ar-YE', { year: 'numeric', month: '2-digit', day: '2-digit' })
     : new Date().toLocaleDateString('ar-YE', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
-  // Styled text logo (fast, no large image download)
-  const logoHTML = `
+  // Styled text logo or image logo
+  const logoHTML = data.logoUrl ? `
+    <div style="text-align:center;">
+      <img src="${data.logoUrl}" alt="Logo" style="max-height:55px; max-width:110px; object-fit:contain; border-radius:8px;" />
+    </div>` : `
     <div style="
       display:inline-block;
       border:3px solid ${ORANGE};

@@ -112,6 +112,11 @@ export default function AdminWasalniRequests() {
     },
   });
 
+  const { data: uiSettings } = useQuery<any[]>({ queryKey: ['/api/ui-settings'] });
+  const appLogoUrl = uiSettings?.find((s: any) => s.key === 'invoice_company_logo')?.value || 
+                     uiSettings?.find((s: any) => s.key === 'header_logo_url')?.value || 
+                     uiSettings?.find((s: any) => s.key === 'sidebar_logo_url')?.value || '';
+
   // ─── توليد سند PDF لطلب وصل لي ─────────────────────────────────────
   const handleGenerateWasalniPDF = async (request: any) => {
     const id = request.id || request.requestNumber;
@@ -124,6 +129,7 @@ export default function AdminWasalniRequests() {
       await generateOrderPDF({
         orderNumber: request.requestNumber || request.id?.slice(0, 8),
         date: request.createdAt || request.scheduledDate,
+        logoUrl: appLogoUrl,
         items: [{ name: description, quantity: 1, price: fee }],
         subtotal: fee,
         deliveryFee: 0,

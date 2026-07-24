@@ -372,6 +372,13 @@ function PayrollTable({ employees, uiSettings }: { employees?: Employee[]; uiSet
   const getSetting = (key: string, fb = '') => uiSettings?.find((s: any) => s.key === key)?.value || fb;
   const companyLogo = getSetting('invoice_company_logo') || getSetting('header_logo_url') || getSetting('sidebar_logo_url');
   const companyName = getSetting('invoice_company_name', 'السريع ون');
+  const primaryColor = getSetting('invoice_primary_color', '#3b82f6');
+  const headerText = getSetting('invoice_header_text', 'كشف حساب ومستند صرف رواتب');
+  const companyAddress = getSetting('invoice_company_address', '');
+  const companyPhone = getSetting('invoice_company_phone', '');
+  const stampText = getSetting('invoice_stamp_text', 'ختم وتوقيع المحاسب المختص');
+  const signatureText = getSetting('invoice_signature_text', 'توقيع الموظف المستلم');
+  const footerText = getSetting('invoice_footer_text', 'شكراً لجهودكم وتفانيكم في العمل');
 
   const handlePaySubmit = () => {
     if (!selectedEmp) return;
@@ -644,68 +651,89 @@ function PayrollTable({ employees, uiSettings }: { employees?: Employee[]; uiSet
         {/* Modal: Print Voucher */}
         <Dialog open={showVoucherModal} onOpenChange={setShowVoucherModal}>
           <DialogContent className="max-w-xl rtl p-0 overflow-hidden" dir="rtl">
-            <div className="p-6 bg-white space-y-4">
-              <div className="flex items-center justify-between border-b pb-4">
+            <div className="bg-white space-y-4">
+              <div 
+                className="p-4 text-white flex items-center justify-between"
+                style={{ backgroundColor: primaryColor }}
+              >
                 <div>
-                  <h2 className="text-lg font-black text-gray-900">{companyName}</h2>
-                  <p className="text-xs text-gray-500">سند صرف مستحقات راتب موظف</p>
-                  <p className="text-[10px] text-gray-400">تاريخ الإصدار: {new Date().toLocaleDateString('ar-YE')}</p>
+                  <h2 className="text-xl font-black">{companyName}</h2>
+                  <p className="text-xs opacity-90">{headerText}</p>
+                  <p className="text-[11px] opacity-80 mt-1">تاريخ الإصدار: {new Date().toLocaleDateString('ar-YE')}</p>
                 </div>
                 {companyLogo && (
-                  <img src={companyLogo} alt="Logo" className="h-12 w-12 object-contain rounded p-1 border" />
+                  <img src={companyLogo} alt="Logo" className="h-14 w-14 object-contain bg-white/90 rounded-lg p-1 shadow-sm" />
                 )}
               </div>
 
-              <div className="space-y-3 text-xs">
-                <div className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg border">
+              <div className="p-6 space-y-4 text-xs">
+                <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
                   <div>
                     <span className="text-gray-500">اسم الموظف:</span>
-                    <p className="font-bold text-gray-900">{selectedEmp?.name}</p>
+                    <p className="font-bold text-gray-900 text-sm">{selectedEmp?.name}</p>
                   </div>
                   <div>
                     <span className="text-gray-500">القسم والفرع:</span>
                     <p className="font-bold text-gray-900">{selectedEmp?.department || 'الإدارة'} - {selectedEmp?.branch || 'الفرع الرئيسي'}</p>
                   </div>
+                  {companyPhone && (
+                    <div>
+                      <span className="text-gray-500">هاتف الشركة:</span>
+                      <p className="font-semibold text-gray-700">{companyPhone}</p>
+                    </div>
+                  )}
+                  {companyAddress && (
+                    <div>
+                      <span className="text-gray-500">العنوان:</span>
+                      <p className="font-semibold text-gray-700">{companyAddress}</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border rounded-lg overflow-hidden mt-2">
                   <Table>
                     <TableHeader className="bg-gray-100">
                       <TableRow>
-                        <TableHead className="text-right text-xs">البند</TableHead>
-                        <TableHead className="text-left text-xs">المبلغ</TableHead>
+                        <TableHead className="text-right text-xs font-bold">البند / البيان</TableHead>
+                        <TableHead className="text-left text-xs font-bold">المبلغ</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       <TableRow>
-                        <TableCell className="text-xs">الراتب الأساسي</TableCell>
+                        <TableCell className="text-xs">الراتب الأساسي الشهر الحالي</TableCell>
                         <TableCell className="text-xs text-left font-bold">{formatCurrency(selectedEmp?.salary || 0)}</TableCell>
                       </TableRow>
                       <TableRow className="bg-blue-50 font-black">
-                        <TableCell className="text-xs text-blue-900">صافي المستحق المدفوع</TableCell>
-                        <TableCell className="text-xs text-left text-blue-900">{formatCurrency(selectedEmp?.salary || 0)}</TableCell>
+                        <TableCell className="text-xs text-blue-900">صافي المستحق المدفوع للموظف</TableCell>
+                        <TableCell className="text-xs text-left text-blue-900 text-sm">{formatCurrency(selectedEmp?.salary || 0)}</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
                 </div>
 
+                {footerText && (
+                  <div className="p-2.5 bg-gray-50 rounded border text-[11px] text-gray-600 text-center">
+                    {footerText}
+                  </div>
+                )}
+
                 <div className="pt-6 grid grid-cols-2 text-center text-xs font-bold text-gray-700 border-t mt-4">
                   <div>
-                    <p>توقيع الموظف المستلم</p>
+                    <p>{signatureText || 'توقيع الموظف المستلم'}</p>
                     <div className="h-10 mt-2 border-b border-dashed w-36 mx-auto"></div>
                   </div>
                   <div>
-                    <p>ختم وتوقيع المحاسب المختص</p>
+                    <p>{stampText || 'ختم وتوقيع المحاسب المختص'}</p>
                     <div className="h-10 mt-2 border-b border-dashed w-36 mx-auto"></div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t">
-                <Button variant="outline" size="sm" onClick={() => setShowVoucherModal(false)}>إلغاء</Button>
-                <Button size="sm" onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white gap-1 font-bold">
-                  <Printer className="w-3.5 h-3.5" /> طباعة السند
-                </Button>
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <Button variant="outline" size="sm" onClick={() => setShowVoucherModal(false)}>إلغاء</Button>
+                  <Button size="sm" onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white gap-1 font-bold">
+                    <Printer className="w-3.5 h-3.5" /> طباعة السند
+                  </Button>
+                </div>
               </div>
             </div>
           </DialogContent>
